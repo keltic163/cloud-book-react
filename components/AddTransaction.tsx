@@ -1,7 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { parseSmartInput } from '../services/geminiService';
-import { TransactionType } from '../types'; // ❌ 移除 Category 引用，因為它現在只是型別，不是值
+import { TransactionType } from '../types';
+// ✅ 新增 Mic, MicOff, Wand2 圖示
+import { Mic, MicOff, Check, Wand2 } from 'lucide-react'; 
+
+// 擴充 window 物件以支援瀏覽器語音 API
+declare global {
+  interface Window {
+    webkitSpeechRecognition: any;
+    SpeechRecognition: any;
+  }
+}
 
 const MagicWandIcon = ({ className }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m19 14-4-4 4-4"/><path d="M15 10H7"/><path d="M7 21a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2Z"/></svg>
@@ -16,28 +26,34 @@ interface Props {
 }
 
 const AddTransaction: React.FC<Props> = ({ onComplete }) => {
-  // ✅ 修正 1: 從 AppContext 取出 categories (這是最新的動態清單)
-  const { addTransaction, currentUser, selectedDate, categories } = useAppContext();
+  // 1. 從 AppContext 取出分類
+  const { addTransaction, currentUser, selectedDate, expenseCategories, incomeCategories } = useAppContext();
   const [mode, setMode] = useState<'manual' | 'smart'>('smart');
   
   // Smart Input State
   const [smartInput, setSmartInput] = useState('');
   const [isParsing, setIsParsing] = useState(false);
+  const [isListening, setIsListening] = useState(false); // ✅ 語音狀態
 
   // Manual Form State
   const [amount, setAmount] = useState<string>('');
   const [type, setType] = useState<TransactionType>(TransactionType.EXPENSE);
   
-  // ✅ 修正 2: 初始值改用動態清單的第一項，或是寫死一個預設字串
-  // 因為 Category.FOOD 已經不存在了
   const [category, setCategory] = useState<string>('');
 
-  // 確保當 categories 載入完成後，category 有預設值
+  // 2. 動態決定目前該顯示哪一組分類
+  const currentCategories = type === TransactionType.EXPENSE 
+      ? (expenseCategories || []) 
+      : (incomeCategories || []);
+
+  // 3. 當切換收支類型時，自動重設分類為該類型的第一個選項
   useEffect(() => {
-      if (categories.length > 0 && !category) {
-          setCategory(categories[0]);
+      if (currentCategories.length > 0) {
+          if (!currentCategories.includes(category)) {
+              setCategory(currentCategories[0]);
+          }
       }
-  }, [categories, category]);
+  }, [type, currentCategories, category]);
   
   const [description, setDescription] = useState('');
   const [rewards, setRewards] = useState<string>('0');
@@ -51,26 +67,67 @@ const AddTransaction: React.FC<Props> = ({ onComplete }) => {
     return `${year}-${month}-${day}`;
   });
 
+  // ✅ 語音輸入處理邏輯
+  const handleVoiceInput = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("您的瀏覽器不支援語音輸入功能 (請使用 Chrome 或 Safari)");
+      return;
+    }
+
+    if (isListening) {
+      setIsListening(false);
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'zh-TW'; 
+    recognition.continuous = false;
+    recognition.interimResults = true;
+
+    recognition.onstart = () => setIsListening(true);
+
+    recognition.onresult = (event: any) => {
+      const transcript = Array.from(event.results)
+        .map((result: any) => result[0])
+        .map((result) => result.transcript)
+        .join('');
+      
+      setSmartInput(transcript); 
+    };
+
+    recognition.onend = () => setIsListening(false);
+    recognition.onerror = (event: any) => {
+      console.error("Speech error", event.error);
+      setIsListening(false);
+    };
+
+    recognition.start();
+  };
+
   const handleSmartSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!smartInput.trim()) return;
 
     setIsParsing(true);
 
-    // ✅ 修正 3: 直接將 context 中的 categories 傳給 AI
-    // 不需要再合併 history，因為 context 裡的 categories 已經是最完整的清單
-    const result = await parseSmartInput(smartInput, categories);
+    // 4. 將兩組分類合併傳給 AI
+    const allCategories = [...(expenseCategories || []), ...(incomeCategories || [])];
+    const result = await parseSmartInput(smartInput, allCategories);
     setIsParsing(false);
 
     if (result) {
       setAmount(result.amount.toString());
-      setType(result.type as TransactionType);
       
-      // AI 回傳的分類如果存在於清單中就使用，否則預設為第一個分類
-      if (categories.includes(result.category)) {
+      const newType = result.type as TransactionType;
+      setType(newType);
+      
+      const targetList = newType === TransactionType.EXPENSE ? expenseCategories : incomeCategories;
+
+      if (targetList && targetList.includes(result.category)) {
           setCategory(result.category);
       } else {
-          setCategory(categories[0] || '其他');
+          setCategory(targetList?.[0] || '其他');
       }
       
       setDescription(result.description);
@@ -80,7 +137,7 @@ const AddTransaction: React.FC<Props> = ({ onComplete }) => {
         setDate(result.date);
       }
 
-      setMode('manual'); // 切換回手動模式讓使用者檢查
+      setMode('manual');
     } else {
       alert('無法理解輸入內容，請重試或使用手動模式輸入。');
     }
@@ -91,7 +148,7 @@ const AddTransaction: React.FC<Props> = ({ onComplete }) => {
     addTransaction({
       amount: parseFloat(amount),
       type,
-      category: category, // ✅ 這裡現在是 string，不需要轉型
+      category: category,
       description,
       rewards: parseFloat(rewards) || 0,
       date: new Date(date).toISOString(),
@@ -101,7 +158,6 @@ const AddTransaction: React.FC<Props> = ({ onComplete }) => {
     onComplete();
   };
 
-  // Shared class for manual input fields
   const inputClass = "w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 dark:text-slate-100 transition-colors";
 
   return (
@@ -112,7 +168,7 @@ const AddTransaction: React.FC<Props> = ({ onComplete }) => {
           onClick={() => setMode('smart')}
           className={`flex-1 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${mode === 'smart' ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-500' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}
         >
-          <MagicWandIcon className="w-4 h-4" />
+          <Wand2 className="w-4 h-4" />
           智慧輸入
         </button>
         <button
@@ -130,12 +186,31 @@ const AddTransaction: React.FC<Props> = ({ onComplete }) => {
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                 用文字描述交易
               </label>
-              <textarea
-                value={smartInput}
-                onChange={(e) => setSmartInput(e.target.value)}
-                placeholder="例如：昨天晚餐吃義大利麵 500元，回饋 20 點"
-                className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 min-h-[120px] text-slate-900 dark:text-slate-100 placeholder:text-slate-400 resize-none transition-colors"
-              />
+              
+              {/* ✅ 輸入框與語音按鈕容器 */}
+              <div className="relative">
+                <textarea
+                  value={smartInput}
+                  onChange={(e) => setSmartInput(e.target.value)}
+                  placeholder="例如：昨天晚餐吃義大利麵 500元，回饋 20 點"
+                  className="w-full p-3 pb-12 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 min-h-[120px] text-slate-900 dark:text-slate-100 placeholder:text-slate-400 resize-none transition-colors"
+                />
+                
+                {/* 🎤 語音按鈕 */}
+                <button
+                  type="button"
+                  onClick={handleVoiceInput}
+                  className={`absolute bottom-3 right-3 p-2 rounded-full transition-all duration-200 shadow-sm ${
+                    isListening 
+                      ? 'bg-rose-500 text-white animate-pulse shadow-rose-200' 
+                      : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-600'
+                  }`}
+                  title="語音輸入"
+                >
+                  {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                </button>
+              </div>
+
               <p className="text-xs text-slate-400 mt-2">
                 AI 將自動分析金額、分類、描述、回饋以及日期。
               </p>
@@ -198,8 +273,8 @@ const AddTransaction: React.FC<Props> = ({ onComplete }) => {
                   onChange={(e) => setCategory(e.target.value)}
                   className={`${inputClass} p-2.5 text-sm`}
                 >
-                  {/* ✅ 修正 4: 這裡改用動態 categories 陣列來產生選項 */}
-                  {categories.map((c) => (
+                  {/* 5. 使用 currentCategories 渲染選項 */}
+                  {currentCategories.map((c) => (
                     <option key={c} value={c}>{c}</option>
                   ))}
                 </select>

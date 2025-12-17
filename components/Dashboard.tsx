@@ -1,8 +1,8 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../contexts/AppContext';
-import { TransactionType } from '../types'; // ❌ 已移除 Category 引用
+import { TransactionType } from '../types';
 import { EditTransactionModal } from './TransactionList';
-import SystemAnnouncement from './SystemAnnouncement'; // ✅ 1. 引入跑馬燈元件
+import SystemAnnouncement from './SystemAnnouncement';
 
 const SparklesIcon = ({ className }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
@@ -11,7 +11,6 @@ const SparklesIcon = ({ className }: { className?: string }) => (
 const SWIPE_THRESHOLD = 50; // Minimum pixels for a swipe to register
 
 const Dashboard = () => {
-  // ❌ 移除 advice 相關狀態，因為不再需要 AI 分析
   const { transactions, users, updateTransaction, deleteTransaction, setSelectedDate } = useAppContext();
   const [currentDate, setCurrentDate] = useState(new Date());
   
@@ -51,12 +50,31 @@ const Dashboard = () => {
     return { income, expense, balance: income - expense };
   }, [transactions, currentDate]);
 
-  // Calculate Total Rewards (Accumulated all time)
-  const totalRewards = useMemo(() => {
-    return transactions.reduce((acc, t) => acc + (t.rewards || 0), 0);
-  }, [transactions]);
+  // ✅ 修改：計算「本月回饋」與「歷史總回饋」
+  // 這裡使用 currentDate，所以當你切換月份時，本月回饋也會跟著變
+  const rewardStats = useMemo(() => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
 
-  // ❌ 移除 useEffect (原本用來呼叫 AI 分析)
+    let monthRewards = 0;
+    let totalRewards = 0;
+
+    transactions.forEach(t => {
+      const reward = t.rewards || 0;
+      if (reward > 0) {
+        // 1. 累加到歷史總額
+        totalRewards += reward;
+
+        // 2. 檢查是否為當前檢視的月份
+        const tDate = new Date(t.date);
+        if (tDate.getFullYear() === year && tDate.getMonth() === month) {
+          monthRewards += reward;
+        }
+      }
+    });
+
+    return { monthRewards, totalRewards };
+  }, [transactions, currentDate]);
 
   // Calendar Logic
   const calendarData = useMemo(() => {
@@ -178,7 +196,6 @@ const Dashboard = () => {
     return num.toString();
   };
   
-  // ✅ 修正：改用字串比對，並維持 Dark Mode 樣式
   const getCategoryColor = (cat: string) => {
     switch (cat) {
       case '餐飲': return 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400';
@@ -200,10 +217,10 @@ const Dashboard = () => {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10 relative">
       
-      {/* ✅ 2. 插入跑馬燈 (最上方) */}
+      {/* 跑馬燈 (最上方) */}
       <SystemAnnouncement />
 
-      {/* 3. Calendar View (移到最上方) */}
+      {/* Calendar View */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-100 dark:border-slate-800 relative z-0 transition-colors">
         <div className="flex items-center justify-between mb-4 px-1">
            <h3 className="font-bold text-slate-800 dark:text-white">收支日曆</h3>
@@ -275,7 +292,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* 4. Monthly Balance Card */}
+      {/* Monthly Balance Card */}
       <div 
         className="relative bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-6 text-white shadow-xl cursor-grab active:cursor-grabbing"
         onTouchStart={handleTouchStart}
@@ -324,22 +341,32 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* 5. Rewards Card (Accumulated) */}
-      <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-900/30 rounded-2xl p-5 flex items-center justify-between shadow-sm transition-colors" role="region" aria-label="累積回饋">
-        <div>
-          <h3 className="text-amber-800 dark:text-amber-400 font-semibold mb-1">累積回饋</h3>
-          <p className="text-amber-600 dark:text-amber-500/80 text-sm">累積的點數與現金回饋</p>
-        </div>
-        <div className="text-right">
-          <div className="text-2xl font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1" aria-label={`累積回饋 ${totalRewards.toLocaleString()}點或元`}>
-            <SparklesIcon className="w-5 h-5" aria-hidden="true" />
-            {totalRewards.toLocaleString()}
+      {/* ✅ Rewards Card (已更新為：主顯示本月回饋，副顯示歷史累積) */}
+      <div className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 p-5 rounded-2xl border border-amber-100 dark:border-amber-800/30 shadow-sm" role="region" aria-label="信用卡回饋統計">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="p-2 bg-amber-100 dark:bg-amber-800 rounded-lg text-amber-600 dark:text-amber-300">
+            <SparklesIcon className="w-5 h-5" />
           </div>
-          <span className="text-xs text-amber-500 font-medium">點/元</span>
+          <span className="text-sm font-medium text-amber-800 dark:text-amber-200">
+            消費回饋
+          </span>
+        </div>
+        
+        {/* 主要數字：本月回饋 */}
+        <div className="flex items-baseline gap-1">
+          <span className="text-2xl font-bold text-amber-700 dark:text-amber-400">
+            ${rewardStats.monthRewards.toLocaleString()}
+          </span>
+          <span className="text-xs text-amber-600/70 dark:text-amber-500/70 font-medium">
+            ({currentDate.getMonth() + 1}月)
+          </span>
+        </div>
+
+        {/* 次要數字：歷史總計 */}
+        <div className="mt-1 text-xs text-amber-600/60 dark:text-amber-500/60 font-medium">
+          歷史累計: ${rewardStats.totalRewards.toLocaleString()}
         </div>
       </div>
-
-      {/* ❌ 6. AI Insight 已移除 */}
 
       {/* Slide-Up Day Detail Drawer */}
       {selectedDay && (

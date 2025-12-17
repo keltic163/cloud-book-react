@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Transaction, User, SavedLedger, DEFAULT_CATEGORIES } from '../types';
+import { Transaction, User, SavedLedger } from '../types';
+import { DEFAULT_EXPENSE_CATEGORIES, DEFAULT_INCOME_CATEGORIES } from '../constants';
 import { useAuth } from './AuthContext';
 import { db, isMockMode } from '../firebase';
 import { 
@@ -15,6 +16,8 @@ import {
   getDoc,
   arrayUnion
 } from 'firebase/firestore';
+
+
 
 interface AppContextType {
   transactions: Transaction[];
@@ -39,10 +42,12 @@ interface AppContextType {
   isDarkMode: boolean;
   toggleTheme: () => void;
   
-  // ✅ 新增分類管理相關介面
-  categories: string[];
-  addCategory: (category: string) => Promise<void>;
-  deleteCategory: (category: string) => Promise<void>;
+  // ✅ 修改：拆分為支出與收入分類
+  expenseCategories: string[];
+  incomeCategories: string[];
+  // type 參數用來區分是新增/刪除哪一種
+  addCategory: (type: 'expense' | 'income', category: string) => Promise<void>;
+  deleteCategory: (type: 'expense' | 'income', category: string) => Promise<void>;
   resetCategories: () => Promise<void>;
 }
 
@@ -62,8 +67,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
   
-  // ✅ 新增：分類狀態 (預設先載入預設值)
-  const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
+  // ✅ 修改：拆分狀態
+  const [expenseCategories, setExpenseCategories] = useState<string[]>(DEFAULT_EXPENSE_CATEGORIES);
+  const [incomeCategories, setIncomeCategories] = useState<string[]>(DEFAULT_INCOME_CATEGORIES);
 
   // Local fallback state
   const [localUsers, setLocalUsers] = useState<User[]>([{
@@ -222,8 +228,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
              photoURL: user.photoURL,
              email: user.email
           }],
-          // ✅ 新增：初始化分類清單
-          categories: DEFAULT_CATEGORIES
+          // ✅ 修改：初始化寫入分開的分類
+          expenseCategories: DEFAULT_EXPENSE_CATEGORIES,
+          incomeCategories: DEFAULT_INCOME_CATEGORIES
         };
         await setDoc(newLedgerRef, newLedgerData);
         
@@ -275,13 +282,28 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         if (data.members) {
           setUsers(data.members);
         }
-        // ✅ 新增：同步分類清單
-        if (data.categories) {
-          setCategories(data.categories);
+        
+        // ✅ 修改：同步分類 (處理新舊資料相容)
+        // 1. 讀取支出分類
+        if (data.expenseCategories) {
+            setExpenseCategories(data.expenseCategories);
+        } else if (data.categories) {
+            // 舊版資料相容：如果沒有 expenseCategories，但有 categories，則視為支出
+            setExpenseCategories(data.categories);
+            // 順手把舊資料遷移成新格式
+            updateDoc(ledgerRef, { 
+                expenseCategories: data.categories,
+                incomeCategories: data.incomeCategories || DEFAULT_INCOME_CATEGORIES
+            });
         } else {
-          // 如果是舊帳本沒有 categories 欄位，自動補上預設值
-          updateDoc(ledgerRef, { categories: DEFAULT_CATEGORIES });
-          setCategories(DEFAULT_CATEGORIES);
+            setExpenseCategories(DEFAULT_EXPENSE_CATEGORIES);
+        }
+
+        // 2. 讀取收入分類
+        if (data.incomeCategories) {
+            setIncomeCategories(data.incomeCategories);
+        } else {
+            setIncomeCategories(DEFAULT_INCOME_CATEGORIES);
         }
       }
     });
@@ -295,31 +317,48 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // --- Actions ---
 
-  // ✅ 新增：新增分類
-  const addCategory = async (category: string) => {
-    if (!ledgerId || !db || isMockMode) return; // Mock mode implementation skipped for brevity
-    if (categories.includes(category)) return;
-
-    const newCategories = [...categories, category];
-    setCategories(newCategories); // Optimistic update
-    await updateDoc(doc(db, 'ledgers', ledgerId), { categories: newCategories });
-  };
-
-  // ✅ 新增：刪除分類
-  const deleteCategory = async (category: string) => {
+  // ✅ 修改：新增分類 (區分 type)
+  const addCategory = async (type: 'expense' | 'income', category: string) => {
     if (!ledgerId || !db || isMockMode) return;
     
-    const newCategories = categories.filter(c => c !== category);
-    setCategories(newCategories); // Optimistic update
-    await updateDoc(doc(db, 'ledgers', ledgerId), { categories: newCategories });
+    if (type === 'expense') {
+        if (expenseCategories.includes(category)) return;
+        const newCategories = [...expenseCategories, category];
+        setExpenseCategories(newCategories); 
+        await updateDoc(doc(db, 'ledgers', ledgerId), { expenseCategories: newCategories });
+    } else {
+        if (incomeCategories.includes(category)) return;
+        const newCategories = [...incomeCategories, category];
+        setIncomeCategories(newCategories);
+        await updateDoc(doc(db, 'ledgers', ledgerId), { incomeCategories: newCategories });
+    }
   };
 
-  // ✅ 新增：重置分類
+  // ✅ 修改：刪除分類 (區分 type)
+  const deleteCategory = async (type: 'expense' | 'income', category: string) => {
+    if (!ledgerId || !db || isMockMode) return;
+    
+    if (type === 'expense') {
+        const newCategories = expenseCategories.filter(c => c !== category);
+        setExpenseCategories(newCategories);
+        await updateDoc(doc(db, 'ledgers', ledgerId), { expenseCategories: newCategories });
+    } else {
+        const newCategories = incomeCategories.filter(c => c !== category);
+        setIncomeCategories(newCategories);
+        await updateDoc(doc(db, 'ledgers', ledgerId), { incomeCategories: newCategories });
+    }
+  };
+
+  // ✅ 修改：重置分類
   const resetCategories = async () => {
     if (!ledgerId || !db || isMockMode) return;
     
-    setCategories(DEFAULT_CATEGORIES);
-    await updateDoc(doc(db, 'ledgers', ledgerId), { categories: DEFAULT_CATEGORIES });
+    setExpenseCategories(DEFAULT_EXPENSE_CATEGORIES);
+    setIncomeCategories(DEFAULT_INCOME_CATEGORIES);
+    await updateDoc(doc(db, 'ledgers', ledgerId), { 
+        expenseCategories: DEFAULT_EXPENSE_CATEGORIES,
+        incomeCategories: DEFAULT_INCOME_CATEGORIES
+    });
   };
 
   const createLedger = async (name: string) => {
@@ -529,7 +568,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       toggleTheme,
       
       // ✅ 導出新功能
-      categories,
+      expenseCategories,
+      incomeCategories,
       addCategory,
       deleteCategory,
       resetCategories

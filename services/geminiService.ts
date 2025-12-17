@@ -1,6 +1,8 @@
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { app } from "../firebase"; // 確保引入的是初始化的 app
-import { TransactionType, DEFAULT_CATEGORIES } from "../types";
+import { TransactionType } from "../types"; 
+// ✅ 修改：引入新的兩組常數
+import { DEFAULT_EXPENSE_CATEGORIES, DEFAULT_INCOME_CATEGORIES } from "../constants";
 
 // 初始化 Cloud Functions
 const functions = getFunctions(app);
@@ -14,12 +16,16 @@ export interface ParsedTransactionData {
   date?: string;
 }
 
+// ✅ 修改：合併兩組分類作為預設備案
+const defaultAllCategories = [...DEFAULT_EXPENSE_CATEGORIES, ...DEFAULT_INCOME_CATEGORIES];
+
 /**
  * 呼叫 Firebase Cloud Function (後端) 進行 AI 解析
  */
 export const parseSmartInput = async (
   input: string, 
-  availableCategories: string[] = DEFAULT_CATEGORIES 
+  // ✅ 修改：預設值改用合併後的新陣列
+  availableCategories: string[] = defaultAllCategories 
 ): Promise<ParsedTransactionData | null> => {
   try {
     // 建立後端函式參照
@@ -39,5 +45,3 @@ export const parseSmartInput = async (
     return null;
   }
 };
-
-// (記得 getFinancialAdvice 已經移除了，這裡不需要放)

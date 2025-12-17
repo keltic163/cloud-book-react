@@ -34,9 +34,11 @@ const Layout = () => {
       {/* Top Header */}
       <header className="bg-white dark:bg-slate-900 shadow-sm border-b border-transparent dark:border-slate-800 px-4 py-3 sticky top-0 z-10 flex justify-between items-center transition-colors">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold">
-            記
-          </div>
+          <img 
+                src="/apple-touch-icon.png" 
+                alt="Logo" 
+                className="w-10 h-10 rounded-xl shadow-lg shadow-indigo-200 dark:shadow-none" 
+              />
           <h1 className="text-xl font-bold text-slate-800 dark:text-white tracking-tight">CloudLedger 雲記</h1>
         </div>
         

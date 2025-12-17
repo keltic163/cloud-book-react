@@ -1,7 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
-import { isMockMode } from '../firebase';
 
 // --- Icons ---
 const DownloadIcon = ({ className }: { className?: string }) => (
@@ -60,6 +59,143 @@ const RefreshIcon = ({ className }: { className?: string }) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
 );
 
+const ChevronRightIcon = ({ className }: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m9 18 6-6-6-6"/></svg>
+);
+
+// ✅ 新增：CategoryManagerModal 獨立元件
+const CategoryManagerModal = ({ onClose }: { onClose: () => void }) => {
+    const { 
+        expenseCategories, 
+        incomeCategories, 
+        addCategory, 
+        deleteCategory, 
+        resetCategories 
+    } = useAppContext();
+
+    const [newExpenseCat, setNewExpenseCat] = useState('');
+    const [newIncomeCat, setNewIncomeCat] = useState('');
+
+    const handleAdd = async (e: React.FormEvent, type: 'expense' | 'income') => {
+        e.preventDefault();
+        const val = type === 'expense' ? newExpenseCat : newIncomeCat;
+        if (!val.trim()) return;
+        
+        await addCategory(type, val.trim());
+        if (type === 'expense') setNewExpenseCat('');
+        else setNewIncomeCat('');
+    };
+
+    const handleDelete = async (type: 'expense' | 'income', cat: string) => {
+        if (window.confirm(`確定要刪除「${cat}」分類嗎？`)) {
+            await deleteCategory(type, cat);
+        }
+    };
+
+    const handleReset = async () => {
+        if (window.confirm('確定要重置為預設分類嗎？')) {
+            await resetCategories();
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
+            <div 
+                className="bg-white dark:bg-slate-900 w-full max-w-2xl max-h-[90vh] rounded-2xl shadow-2xl flex flex-col border border-slate-200 dark:border-slate-800 animate-in slide-in-from-bottom-10 duration-300"
+                onClick={(e) => e.stopPropagation()}
+            >
+                {/* Header */}
+                <div className="flex justify-between items-center p-5 border-b border-slate-100 dark:border-slate-800">
+                    <div className="flex items-center gap-2">
+                        <TagIcon className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                        <h3 className="font-bold text-lg text-slate-800 dark:text-slate-100">分類管理</h3>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button 
+                            onClick={handleReset}
+                            className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors"
+                            title="重置為預設分類"
+                        >
+                            <RefreshIcon className="w-5 h-5" />
+                        </button>
+                        <button 
+                            onClick={onClose}
+                            className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                    </div>
+                </div>
+
+                {/* Body (Scrollable) */}
+                <div className="overflow-y-auto p-6">
+                    <div className="grid md:grid-cols-2 gap-8">
+                        {/* 1. Expense Categories */}
+                        <div className="space-y-4">
+                            <h4 className="text-base font-bold text-rose-600 dark:text-rose-400 flex items-center gap-2 pb-2 border-b border-rose-100 dark:border-rose-900/30">
+                                <div className="w-2.5 h-2.5 rounded-full bg-rose-500"></div>
+                                支出分類
+                            </h4>
+                            <div className="flex flex-wrap gap-2 min-h-[100px] content-start">
+                                {expenseCategories.map((cat) => (
+                                    <div key={cat} className="group flex items-center gap-2 px-3 py-1.5 bg-rose-50 dark:bg-rose-900/20 border border-rose-100 dark:border-rose-800 rounded-full text-sm text-rose-900 dark:text-rose-100 transition-all hover:border-rose-300">
+                                        <span>{cat}</span>
+                                        <button onClick={() => handleDelete('expense', cat)} className="text-rose-400 hover:text-rose-600 dark:hover:text-rose-200 opacity-60 hover:opacity-100">
+                                            <TrashIcon className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                            <form onSubmit={(e) => handleAdd(e, 'expense')} className="flex gap-2 mt-4">
+                                <input 
+                                    type="text" 
+                                    value={newExpenseCat} 
+                                    onChange={(e) => setNewExpenseCat(e.target.value)}
+                                    placeholder="新增支出分類"
+                                    className="flex-1 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm focus:ring-2 focus:ring-rose-100 dark:focus:ring-rose-900 outline-none dark:text-white"
+                                />
+                                <button type="submit" className="bg-rose-500 text-white px-3.5 rounded-lg hover:bg-rose-600 transition-colors">
+                                    <PlusIcon className="w-5 h-5" />
+                                </button>
+                            </form>
+                        </div>
+
+                        {/* 2. Income Categories */}
+                        <div className="space-y-4">
+                            <h4 className="text-base font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-2 pb-2 border-b border-emerald-100 dark:border-emerald-900/30">
+                                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
+                                收入分類
+                            </h4>
+                            <div className="flex flex-wrap gap-2 min-h-[100px] content-start">
+                                {incomeCategories.map((cat) => (
+                                    <div key={cat} className="group flex items-center gap-2 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800 rounded-full text-sm text-emerald-900 dark:text-emerald-100 transition-all hover:border-emerald-300">
+                                        <span>{cat}</span>
+                                        <button onClick={() => handleDelete('income', cat)} className="text-emerald-400 hover:text-emerald-600 dark:hover:text-emerald-200 opacity-60 hover:opacity-100">
+                                            <TrashIcon className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                            <form onSubmit={(e) => handleAdd(e, 'income')} className="flex gap-2 mt-4">
+                                <input 
+                                    type="text" 
+                                    value={newIncomeCat} 
+                                    onChange={(e) => setNewIncomeCat(e.target.value)}
+                                    placeholder="新增收入分類"
+                                    className="flex-1 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm focus:ring-2 focus:ring-emerald-100 dark:focus:ring-emerald-900 outline-none dark:text-white"
+                                />
+                                <button type="submit" className="bg-emerald-500 text-white px-3.5 rounded-lg hover:bg-emerald-600 transition-colors">
+                                    <PlusIcon className="w-5 h-5" />
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 
 const Settings = () => {
   const { 
@@ -75,11 +211,6 @@ const Settings = () => {
     updateLedgerAlias,
     isDarkMode,
     toggleTheme,
-    // ✅ 新增
-    categories,
-    addCategory,
-    deleteCategory,
-    resetCategories
   } = useAppContext();
   const { signOut } = useAuth();
   
@@ -91,9 +222,9 @@ const Settings = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [editingLedgerId, setEditingLedgerId] = useState<string | null>(null);
   const [tempAlias, setTempAlias] = useState('');
-
-  // New Category State
-  const [newCategory, setNewCategory] = useState('');
+  
+  // ✅ 新增：控制 Modal 開啟狀態
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
 
   // --- Manage Ledgers ---
   const handleCreateLedger = async (e: React.FormEvent) => {
@@ -145,33 +276,6 @@ const Settings = () => {
           showMsg('success', '成功加入共享帳本！');
       } else {
           showMsg('error', '找不到該帳本 ID，請檢查是否正確。');
-      }
-  };
-
-  // --- Category Logic ---
-  const handleAddCategory = async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!newCategory.trim()) return;
-      if (categories.includes(newCategory.trim())) {
-          showMsg('error', '此分類已存在');
-          return;
-      }
-      await addCategory(newCategory.trim());
-      setNewCategory('');
-      showMsg('success', '已新增分類');
-  };
-
-  const handleDeleteCategory = async (cat: string) => {
-      if (window.confirm(`確定要刪除「${cat}」分類嗎？\n(注意：舊的交易紀錄不會被刪除，但以後無法選擇此分類)`)) {
-          await deleteCategory(cat);
-          showMsg('success', '已刪除分類');
-      }
-  };
-
-  const handleResetCategories = async () => {
-      if (window.confirm('確定要重置為預設分類嗎？\n這將移除所有自訂分類。')) {
-          await resetCategories();
-          showMsg('success', '已重置分類');
       }
   };
 
@@ -367,60 +471,7 @@ const Settings = () => {
           </div>
       </div>
 
-      {/* ✅ Category Management Section (New!) */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-100 dark:border-slate-800">
-          <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                  <TagIcon className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-                  <h3 className="font-bold text-slate-800 dark:text-slate-100">分類管理</h3>
-              </div>
-              <button 
-                  onClick={handleResetCategories}
-                  className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors"
-                  title="重置為預設分類"
-              >
-                  <RefreshIcon className="w-4 h-4" />
-              </button>
-          </div>
-
-          <div className="space-y-4">
-              <div className="flex flex-wrap gap-2">
-                  {categories.map((cat) => (
-                      <div 
-                          key={cat} 
-                          className="group flex items-center gap-2 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full text-sm text-slate-700 dark:text-slate-300"
-                      >
-                          <span>{cat}</span>
-                          <button 
-                              onClick={() => handleDeleteCategory(cat)}
-                              className="text-slate-400 hover:text-rose-500 opacity-60 hover:opacity-100 transition-all"
-                          >
-                              <TrashIcon className="w-3.5 h-3.5" />
-                          </button>
-                      </div>
-                  ))}
-              </div>
-
-              <form onSubmit={handleAddCategory} className="flex gap-2">
-                  <input 
-                      type="text" 
-                      value={newCategory}
-                      onChange={(e) => setNewCategory(e.target.value)}
-                      placeholder="新增分類 (例如：貓咪用品)"
-                      className="flex-1 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 outline-none dark:text-white"
-                  />
-                  <button 
-                      type="submit" 
-                      className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-indigo-700 transition-colors flex items-center gap-1"
-                  >
-                      <PlusIcon className="w-4 h-4" />
-                      新增
-                  </button>
-              </form>
-          </div>
-      </div>
-
-      {/* Group Members Section */}
+      {/* ✅ Group Members Section (Moved Up) */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-100 dark:border-slate-800">
         <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-slate-800 dark:text-slate-100">目前帳本成員 ({users.length})</h3>
@@ -445,11 +496,29 @@ const Settings = () => {
         </div>
       </div>
 
-      {/* Data Management Section */}
+      {/* ✅ Data & Category Section (Combined) */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-100 dark:border-slate-800">
-        <h3 className="font-semibold text-slate-800 dark:text-slate-100 mb-4">資料管理</h3>
+        <h3 className="font-semibold text-slate-800 dark:text-slate-100 mb-4">偏好與資料</h3>
         
         <div className="space-y-3">
+          {/* ✅ 1. 分類管理按鈕 (Trigger Modal) */}
+          <button 
+             onClick={() => setShowCategoryModal(true)}
+             className="w-full flex items-center justify-between p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:border-indigo-200 dark:hover:border-indigo-800 transition-all group"
+          >
+             <div className="flex items-center gap-3">
+                <div className="p-2 bg-indigo-100 dark:bg-indigo-900/40 rounded-lg text-indigo-600 dark:text-indigo-400">
+                    <TagIcon className="w-5 h-5" />
+                </div>
+                <div className="text-left">
+                    <div className="font-bold text-slate-700 dark:text-slate-200 group-hover:text-indigo-700 dark:group-hover:text-indigo-300">分類管理</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400">自訂您的收入與支出類別</div>
+                </div>
+             </div>
+             <ChevronRightIcon className="w-5 h-5 text-slate-400 group-hover:text-indigo-500 group-hover:translate-x-1 transition-all" />
+          </button>
+
+          {/* 2. Export Buttons */}
           <div className="grid grid-cols-2 gap-3">
              <button 
                 onClick={handleExportJSON}
@@ -470,15 +539,6 @@ const Settings = () => {
             </button>
           </div>
 
-          <div className="relative">
-             <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-100 dark:border-slate-800"></div>
-             </div>
-             <div className="relative flex justify-center text-xs">
-                <span className="bg-white dark:bg-slate-900 px-2 text-slate-400">或</span>
-             </div>
-          </div>
-
           <button 
             onClick={() => fileInputRef.current?.click()}
             className="w-full flex items-center justify-center gap-2 p-3 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-slate-700 dark:text-slate-300 font-medium shadow-sm"
@@ -497,8 +557,11 @@ const Settings = () => {
       </div>
 
       <div className="text-center text-xs text-slate-400 py-4">
-        CloudLedger 雲記 v3.0.0 © 2025 KrendStudio
+        CloudLedger 雲記 v3.1.0 © 2025 KrendStudio
       </div>
+
+      {/* ✅ Render Modal */}
+      {showCategoryModal && <CategoryManagerModal onClose={() => setShowCategoryModal(false)} />}
     </div>
   );
 };

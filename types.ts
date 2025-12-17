@@ -3,19 +3,6 @@ export enum TransactionType {
   EXPENSE = 'EXPENSE'
 }
 
-// ❌ 移除原本的 enum Category，因為它無法動態新增
-// ✅ 新增：預設分類清單 (當建立新帳本時，以此為初始值)
-export const DEFAULT_CATEGORIES = [
-  '餐飲',
-  '交通',
-  '購物',
-  '居住',
-  '娛樂',
-  '薪資',
-  '投資',
-  '其他'
-];
-
 // 定義 Category 為字串型別，方便後續擴充
 export type Category = string;
 

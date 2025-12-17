@@ -110,6 +110,8 @@ const TransactionList = () => {
   );
 };
 
+// 放在 TransactionList.tsx 的最下方
+
 // Exporting Modal for use in Dashboard
 export const EditTransactionModal = ({ 
     transaction, 
@@ -122,7 +124,8 @@ export const EditTransactionModal = ({
     onSave: (updates: Partial<Transaction>) => void,
     onDelete: () => void
 }) => {
-    const { categories } = useAppContext();
+    // ✅ 1. 修正：取出新的分類清單
+    const { expenseCategories, incomeCategories } = useAppContext();
     
     const [amount, setAmount] = useState(transaction.amount.toString());
     const [type, setType] = useState(transaction.type);
@@ -133,6 +136,18 @@ export const EditTransactionModal = ({
     
     // UI state for delete confirmation
     const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+
+    // ✅ 2. 動態決定目前該顯示哪一組分類 (防呆：給予空陣列預設值)
+    const currentCategories = type === TransactionType.EXPENSE 
+        ? (expenseCategories || []) 
+        : (incomeCategories || []);
+
+    // 當切換收支類型時，如果當前分類不在新清單中，重設為第一個
+    useEffect(() => {
+        if (currentCategories.length > 0 && !currentCategories.includes(category)) {
+            setCategory(currentCategories[0]);
+        }
+    }, [type, currentCategories]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -161,7 +176,7 @@ export const EditTransactionModal = ({
         if (isConfirmingDelete) setIsConfirmingDelete(false);
     };
 
-    // 統一樣式 class (與 AddTransaction 一致)
+    // 統一樣式 class
     const inputClass = "w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none text-sm text-slate-800 dark:text-slate-100 transition-colors";
 
     return (
@@ -170,7 +185,6 @@ export const EditTransactionModal = ({
             onClick={onClose}
         >
             <div 
-                // ✅ 優化：Modal 背景 dark:bg-slate-900
                 className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl animate-in slide-in-from-bottom-10 duration-300 border dark:border-slate-800"
                 onClick={(e) => e.stopPropagation()}
             >
@@ -232,7 +246,8 @@ export const EditTransactionModal = ({
                                 onChange={(e) => setCategory(e.target.value)}
                                 className={inputClass}
                             >
-                                {categories.map((c) => (
+                                {/* ✅ 3. 修正：使用 currentCategories 渲染選項 */}
+                                {currentCategories.map((c) => (
                                     <option key={c} value={c}>{c}</option>
                                 ))}
                             </select>
