@@ -557,7 +557,7 @@ const Settings = () => {
       </div>
 
       <div className="text-center text-xs text-slate-400 py-4">
-        CloudLedger 雲記 v3.2.0 © 2025 KrendStudio
+        CloudLedger 雲記 v3.2.1 © 2025 KrendStudio
       </div>
 
       {/* ✅ Render Modal */}
