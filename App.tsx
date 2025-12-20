@@ -61,7 +61,45 @@ const SyncControl: React.FC = () => {
 
 const Layout = () => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'add' | 'list' | 'settings' | 'stats'>('dashboard');
+  const [voiceAutoStart, setVoiceAutoStart] = useState(false);
+  const pressTimerRef = React.useRef<number | null>(null);
   const { currentUser } = useAppContext(); 
+
+  const startPress = () => {
+    // 700ms 長按判定
+    if (pressTimerRef.current) window.clearTimeout(pressTimerRef.current);
+    pressTimerRef.current = window.setTimeout(() => {
+      // 長按處理：檢查是否設定了 API Key 並啟用
+      const key = localStorage.getItem('user_gemini_key');
+      const enabled = localStorage.getItem('user_gemini_enabled') === '1';
+      if (key && enabled) {
+        setVoiceAutoStart(true);
+        setActiveTab('add');
+      } else {
+        const go = window.confirm('尚未設定 API Key 或未啟用 AI，是否現在前往設定頁？');
+        if (go) setActiveTab('settings');
+      }
+    }, 700);
+  };
+
+  const cancelPress = () => {
+    if (pressTimerRef.current) {
+      window.clearTimeout(pressTimerRef.current);
+      pressTimerRef.current = null;
+    }
+  };
+
+  const endPress = () => {
+    if (pressTimerRef.current) {
+      // 短按 (未達 700ms) -> 正常行為 (由 onClick 處理切換到 add)
+      window.clearTimeout(pressTimerRef.current);
+      pressTimerRef.current = null;
+    } else {
+      // 如果 timer 已經觸發（長按），則重置 flag（在 AddTransaction mount 時會讀取）
+      // Reset after a short delay so AddTransaction can see the flag
+      setTimeout(() => setVoiceAutoStart(false), 1000);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 pb-24 transition-colors duration-300">
@@ -94,7 +132,7 @@ const Layout = () => {
       {/* Main Content */}
       <main className="max-w-md mx-auto p-4 sm:p-6">
         {activeTab === 'dashboard' && <Dashboard />}
-        {activeTab === 'add' && <AddTransaction onComplete={() => setActiveTab('dashboard')} />}
+        {activeTab === 'add' && <AddTransaction autoStartVoice={voiceAutoStart} onComplete={() => { setActiveTab('dashboard'); setVoiceAutoStart(false); }} /> }
         {activeTab === 'list' && <TransactionList />}
         {activeTab === 'stats' && <Statistics />}
         {activeTab === 'settings' && <Settings />}
@@ -120,6 +158,11 @@ const Layout = () => {
 
         <button 
           onClick={() => setActiveTab('add')}
+          onMouseDown={() => startPress()}
+          onMouseUp={() => endPress()}
+          onMouseLeave={() => cancelPress()}
+          onTouchStart={() => startPress()}
+          onTouchEnd={() => endPress()}
           className={`flex flex-col items-center gap-1 p-2 -mt-8 mx-1`}
         >
           <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center shadow-lg transition-transform hover:scale-105 ${activeTab === 'add' ? 'bg-indigo-700 text-white shadow-indigo-500/50' : 'bg-indigo-600 text-white'}`}>

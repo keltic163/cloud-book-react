@@ -38,14 +38,53 @@
     * 新增區塊「智慧輸入設定」。
     * **欄位**：
         * `API Key` (字串輸入)：僅儲存於 `localStorage.getItem('user_gemini_key')`。
-        * `Model` (下拉選單)：選項包含 `Gemini 2.5 Flash`, `Gemini 3.0 Flash Preview`, `Gemma 3 27b`。
+        * `Model` (下拉選單)：選項包含該API Key能啟用的模型(必要時可在設定時發送請求取得清單)。
         * `Enable AI` (開關)：開啟/關閉智慧輸入功能。
     * **提示文字**：在輸入框下方標註「您的 Key 僅儲存於本地裝置，不會上傳至我們的資料庫」。
 
 2.  **前端呼叫邏輯 (API Client)**：
     * 發送請求前，從 `localStorage` 讀取 Key。
-    * **傳輸方式**：將 Key 放入 HTTP Request Header (例如 `x-custom-api-key`)，**不可** 放在 URL 參數中。
-    * 若本地無 Key，則不發送 Header (或是前端阻擋請求)。
+    * **傳輸方式**：將 Key 放入 API 呼叫的 payload（或 Header，例如 `x-custom-api-key`），**不可** 放在 URL 參數中。
+    * 若本地無 Key，則不發送 Key（或由系統策略使用 server key 作為 fallback）。
+    * **開發測試代碼**：系統會支援一個 Functions secret `DEV_KEY_CODE`；如果使用者把此代碼輸入到 API Key 欄位（同一欄位，無需額外標註），後端會在處理該請求時替換為伺服器端的 `GEMINI_API_KEY`（僅供開發/測試使用）。此代碼僅存在於 Functions Secrets，**前端 UI 不會顯示或暴露實際代碼**。
+      
+      **範例（設定 DEV_KEY_CODE 的 CLI 指令）**：
+
+      ```bash
+      firebase functions:secrets:set DEV_KEY_CODE --data "6yhn%TGB" --project <YOUR_PROJECT_ID>
+      ```
+
+      或於本地執行：
+
+      ```powershell
+      pwsh .\scripts\set-dev-key.ps1 -projectId <YOUR_PROJECT_ID>
+      ```
+
+      **注意**：不要把此值寫死在程式碼或提交至版本控制。
+
+      **本地 Emulator 測試（快速指引）**：若要在本地用 Emulator 驗證 `DEV_KEY_CODE` 行為，可使用：
+
+      ```bash
+      # 在同一個 shell 注入環境變數後執行 E2E 測試
+      export GEMINI_API_KEY=server-secret-key DEV_KEY_CODE=6yhn%TGB
+      cd functions
+      npm run test:e2e
+      ```
+
+      Windows PowerShell 範例：
+
+      ```powershell
+      $env:GEMINI_API_KEY='server-secret-key'; $env:DEV_KEY_CODE='6yhn%TGB'; npm run test:e2e -w functions
+      ```
+
+      這會啟動 Functions emulator、以 `DEV_KEY_CODE` 呼叫 `validateKey`，並檢查回傳是否符合預期。
+
+**CI / GitHub Actions**：本專案已新增 CI workflow（`.github/workflows/ci-tests.yml`），會在 PR / push 到 `main` 時執行：
+
+- 在 `functions/` 執行 Unit Tests（Jest）以及 Emulator E2E（`npm run test:e2e`）。
+- 在 root 執行前端 Unit Tests（Vitest）。
+
+請在 GitHub Secrets 中新增 `GEMINI_API_KEY` 與 `DEV_KEY_CODE`，CI 會將它們寫入 `functions/.secret.local` 供 Emulator 本地使用（請勿在 repo 中提交 `.secret.local`）。
 
 3.  **後端 (Firebase Functions)**：
     * **解析邏輯**：優先讀取 `req.headers['x-custom-api-key']`。

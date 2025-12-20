@@ -25,10 +25,20 @@ interface Props {
   onComplete: () => void;
 }
 
-const AddTransaction: React.FC<Props> = ({ onComplete }) => {
+interface Props {
+  onComplete: () => void;
+  autoStartVoice?: boolean;
+}
+
+const AddTransaction: React.FC<Props> = ({ onComplete, autoStartVoice = false }) => {
   // 1. 從 AppContext 取出分類
   const { addTransaction, currentUser, selectedDate, expenseCategories, incomeCategories } = useAppContext();
-  const [mode, setMode] = useState<'manual' | 'smart'>('smart');
+  // 智慧輸入是否已啟用（由 Settings 控制並存在 localStorage）
+  const [isAIEnabled, setIsAIEnabled] = useState<boolean>(() => {
+    return localStorage.getItem('user_gemini_enabled') === '1';
+  });
+  const [mode, setMode] = useState<'manual' | 'smart'>(() => (localStorage.getItem('user_gemini_enabled') === '1' ? 'smart' : 'manual'));
+
   
   // Smart Input State
   const [smartInput, setSmartInput] = useState('');
@@ -66,6 +76,34 @@ const AddTransaction: React.FC<Props> = ({ onComplete }) => {
     const day = String(target.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   });
+
+  // If autoStartVoice was requested, trigger voice input on mount when in smart mode
+  useEffect(() => {
+    // Listen for Settings toggles so the tab visibility updates immediately
+    const handler = (e: any) => {
+      const enabled = typeof e?.detail?.enabled === 'boolean' ? e.detail.enabled : (localStorage.getItem('user_gemini_enabled') === '1');
+      setIsAIEnabled(enabled);
+      if (!enabled && mode === 'smart') setMode('manual');
+    };
+
+    window.addEventListener('user-gemini-enabled-change', handler as EventListener);
+
+    // If autoStartVoice was requested, ensure AI is enabled and auto-start when in smart mode
+    if (autoStartVoice && mode === 'smart' && isAIEnabled) {
+      // Minor delay to ensure component rendered fully
+      setTimeout(() => {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+          // If Web Speech API not available, navigate to settings or notify user
+          alert('您的瀏覽器不支援語音輸入功能 (請使用 Chrome 或 Safari)');
+          return;
+        }
+        handleVoiceInput();
+      }, 200);
+    }
+
+    return () => window.removeEventListener('user-gemini-enabled-change', handler as EventListener);
+  }, [autoStartVoice, mode, isAIEnabled]);
 
   // ✅ 語音輸入處理邏輯
   const handleVoiceInput = () => {
@@ -164,13 +202,16 @@ const AddTransaction: React.FC<Props> = ({ onComplete }) => {
     <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden transition-colors">
       {/* Tabs */}
       <div className="flex border-b border-slate-100 dark:border-slate-800">
-        <button
-          onClick={() => setMode('smart')}
-          className={`flex-1 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${mode === 'smart' ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-500' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}
-        >
-          <Wand2 className="w-4 h-4" />
-          智慧輸入
-        </button>
+        {isAIEnabled && (
+          <button
+            onClick={() => setMode('smart')}
+            className={`flex-1 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${mode === 'smart' ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-500' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}
+          >
+            <Wand2 className="w-4 h-4" />
+            智慧輸入
+          </button>
+        )}
+
         <button
           onClick={() => setMode('manual')}
           className={`flex-1 py-3 text-sm font-medium transition-colors ${mode === 'manual' ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-500' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}

@@ -31,10 +31,15 @@ export const parseSmartInput = async (
     // 建立後端函式參照
     const parseTransactionFn = httpsCallable(functions, 'parseTransaction');
     
-    // 發送請求
+    // Read user-provided key (if any) from localStorage. This allows a user to input a
+    // dev-code here and have the backend substitute the server key when appropriate.
+    const userKey = localStorage.getItem('user_gemini_key') || undefined;
+
+    // 發送請求 (把 apiKey 一併送出供 Functions 決定處理方式)
     const result = await parseTransactionFn({
       text: input,
-      categories: availableCategories
+      categories: availableCategories,
+      apiKey: userKey
     });
 
     // Cloud Functions 回傳的資料在 data 屬性中
@@ -43,5 +48,19 @@ export const parseSmartInput = async (
   } catch (error) {
     console.error("Cloud Function Call Error:", error);
     return null;
+  }
+};
+
+/**
+ * 驗證 / 測試使用者提供的 API Key，並回傳可用模型清單
+ */
+export const validateApiKey = async (apiKey?: string): Promise<{ valid: boolean; models: string[] } > => {
+  try {
+    const validateFn = httpsCallable(functions, 'validateKey');
+    const result = await validateFn({ apiKey });
+    return result.data as { valid: boolean; models: string[] };
+  } catch (err) {
+    console.error('validateKey call failed', err);
+    return { valid: false, models: [] };
   }
 };

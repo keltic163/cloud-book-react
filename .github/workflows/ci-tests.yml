@@ -1,0 +1,72 @@
+name: CI - Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+jobs:
+  functions-tests:
+    name: Functions - Unit & E2E
+    runs-on: ubuntu-latest
+    env:
+      # these will be provided from repository secrets
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      DEV_KEY_CODE: ${{ secrets.DEV_KEY_CODE }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install functions dependencies
+        working-directory: functions
+        run: npm ci
+
+      - name: Install firebase-tools CLI
+        run: npm install -g firebase-tools
+
+      - name: Create local secrets file for emulator (functions/.secret.local)
+        if: env.GEMINI_API_KEY || env.DEV_KEY_CODE
+        run: |
+          mkdir -p functions
+          echo "GEMINI_API_KEY=${GEMINI_API_KEY}" > functions/.secret.local
+          echo "DEV_KEY_CODE=${DEV_KEY_CODE}" >> functions/.secret.local
+        # prevent secrets leaking to logs
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          DEV_KEY_CODE: ${{ secrets.DEV_KEY_CODE }}
+
+      - name: Run unit tests (functions)
+        working-directory: functions
+        run: npm test
+
+      - name: Run Emulator E2E (functions)
+        working-directory: functions
+        run: npm run test:e2e
+
+  frontend-tests:
+    name: Frontend - Unit Tests
+    runs-on: ubuntu-latest
+    needs: functions-tests
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install project dependencies
+        run: npm ci
+
+      - name: Run frontend unit tests
+        run: npm run test:unit

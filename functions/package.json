@@ -7,7 +7,14 @@
     "shell": "npm run build && firebase functions:shell",
     "start": "npm run shell",
     "deploy": "firebase deploy --only functions",
-    "logs": "firebase functions:log"
+    "logs": "firebase functions:log",
+    "test": "jest --runInBand --detectOpenHandles --forceExit",
+    "test:e2e": "firebase emulators:exec --only functions \"node ./test/e2e/callValidate.js\""
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "testMatch": ["**/test/**/*.test.ts"]
   },
   "engines": {
     "node": "24"
@@ -20,7 +27,10 @@
   },
   "devDependencies": {
     "firebase-functions-test": "^3.4.1",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.0",
+    "@types/jest": "^29.5.3"
   },
   "private": true
 }

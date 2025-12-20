@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -197,6 +197,8 @@ const CategoryManagerModal = ({ onClose }: { onClose: () => void }) => {
 };
 
 
+import { validateApiKey } from '../services/geminiService';
+
 const Settings = () => {
   const { 
     transactions, 
@@ -225,6 +227,82 @@ const Settings = () => {
   
   // ✅ 新增：控制 Modal 開啟狀態
   const [showCategoryModal, setShowCategoryModal] = useState(false);
+
+  // --- 智慧輸入 (BYOK) Local State ---
+  const [apiKeyInput, setApiKeyInput] = useState<string>(localStorage.getItem('user_gemini_key') || '');
+  const [isTesting, setIsTesting] = useState(false);
+  const [testResultMsg, setTestResultMsg] = useState<string>('');
+  const [models, setModels] = useState<string[]>([]);
+  const [modelSelected, setModelSelected] = useState<string>(localStorage.getItem('user_gemini_model') || '');
+  const [enabled, setEnabled] = useState<boolean>(localStorage.getItem('user_gemini_enabled') === '1');
+
+  // --- 智慧輸入 行為 ---
+  const saveKey = () => {
+    try {
+      localStorage.setItem('user_gemini_key', apiKeyInput);
+      showMsg('success', 'API Key 已儲存於本地');
+    } catch (e) {
+      showMsg('error', '儲存失敗');
+    }
+  };
+
+  const clearKey = () => {
+    localStorage.removeItem('user_gemini_key');
+    setApiKeyInput('');
+    setModels([]);
+    setModelSelected('');
+    setTestResultMsg('');
+    showMsg('success', 'API Key 已移除');
+  };
+
+  const testKey = async () => {
+    setIsTesting(true);
+    setTestResultMsg('');
+    try {
+      const res = await validateApiKey(apiKeyInput || undefined);
+      if (res.valid) {
+        setModels(res.models);
+        setTestResultMsg(res.models.length > 0 ? `可用模型：${res.models.join(', ')}` : '沒有可用模型');
+        if (!modelSelected && res.models.length > 0) setModelSelected(res.models[0]);
+      } else {
+        setModels([]);
+        setTestResultMsg('Key 無效或沒有可用模型');
+      }
+    } catch (e) {
+      setTestResultMsg('測試時發生錯誤');
+    }
+    setIsTesting(false);
+  };
+
+  const saveModel = () => {
+    if (!modelSelected) {
+      showMsg('error', '請先選擇模型');
+      return;
+    }
+    localStorage.setItem('user_gemini_model', modelSelected);
+    showMsg('success', '模型已儲存');
+  };
+
+  const toggleEnabled = () => {
+    const next = !enabled;
+    setEnabled(next);
+    localStorage.setItem('user_gemini_enabled', next ? '1' : '0');
+    // Dispatch a custom event so other components (e.g., AddTransaction) can react immediately
+    try {
+      window.dispatchEvent(new CustomEvent('user-gemini-enabled-change', { detail: { enabled: next } }));
+    } catch (e) {
+      // ignore
+    }
+    showMsg('success', next ? 'AI 已啟用' : 'AI 已停用');
+  };
+
+  // Sync initial models when component mounts if we have a stored model
+  useEffect(() => {
+    if (modelSelected && !models.includes(modelSelected)) {
+      setModels((cur) => (modelSelected ? [modelSelected, ...cur] : cur));
+    }
+  }, []);
+
 
   // --- Manage Ledgers ---
   const handleCreateLedger = async (e: React.FormEvent) => {
@@ -553,6 +631,65 @@ const Settings = () => {
             accept=".csv" 
             className="hidden" 
           />
+        </div>
+      </div>
+
+      {/* ✅ 智慧輸入設定 (BYOK) */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-100 dark:border-slate-800">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-semibold text-slate-800 dark:text-slate-100">智慧輸入設定 (AI)</h3>
+          <div className="text-xs text-slate-400">您的 Key 僅儲存於本地裝置，不會上傳至伺服器</div>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 block">API Key</label>
+            <div className="flex gap-2 items-center">
+              <input
+                type="password"
+                value={apiKeyInput}
+                onChange={(e) => setApiKeyInput(e.target.value)}
+                placeholder="輸入 API Key 或開發測試代碼 (僅本地儲存)"
+                className="flex-1 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 outline-none dark:text-white"
+              />
+              <button onClick={saveKey} className="px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700">儲存</button>
+              <button onClick={clearKey} className="px-3 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg text-sm hover:bg-slate-200">移除</button>
+            </div>
+            <div className="text-[12px] text-slate-400 mt-1">提示：輸入後只會存在於本地瀏覽器；若為開發測試代碼，後端會用伺服器端 Key 代替（需由專案管理員在 Functions Secret 設定）。</div>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 block">測試 / 取得可用模型</label>
+            <div className="flex gap-2 items-center">
+              <button onClick={testKey} disabled={isTesting} className="px-3 py-2 bg-emerald-500 text-white rounded-lg text-sm hover:bg-emerald-600">{isTesting ? '測試中...' : '測試並抓取模型'}</button>
+              <div className="text-sm text-slate-600 dark:text-slate-300">{testResultMsg}</div>
+            </div>
+
+            {models.length > 0 && (
+              <div className="mt-3">
+                <label className="text-xs font-semibold text-slate-400 mb-2 block">Model</label>
+                <div className="flex gap-2 items-center">
+                  <select value={modelSelected} onChange={(e) => setModelSelected(e.target.value)} className="flex-1 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm outline-none">
+                    {models.map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                  <button onClick={saveModel} className="px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700">儲存模型</button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div>
+              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1 block">啟用智慧輸入</label>
+              <div className="text-[12px] text-slate-400">開啟後部分頁面會啟用 AI 智慧輸入功能 (需先設定 Key)</div>
+            </div>
+            <div>
+              <label className="inline-flex relative items-center cursor-pointer">
+                <input type="checkbox" checked={enabled} onChange={toggleEnabled} className="sr-only peer" />
+                <div className={`w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer ${enabled ? 'peer-checked:bg-indigo-600' : ''}`}></div>
+              </label>
+            </div>
+          </div>
         </div>
       </div>
 
