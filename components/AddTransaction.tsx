@@ -255,6 +255,9 @@ const AddTransaction: React.FC<Props> = ({ onComplete, autoStartVoice = false })
               <p className="text-xs text-slate-400 mt-2">
                 AI 將自動分析金額、分類、描述、回饋以及日期。
               </p>
+              <p className="text-[11px] text-indigo-500 mt-1">
+                長按畫面下方的「+」可快速開啟語音辨識，立即開始輸入。
+              </p>
             </div>
             <button
               type="submit"

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { 
-  signInWithPopup, 
+  signInWithPopup,
+  signInWithRedirect,
   signOut as firebaseSignOut, 
   onAuthStateChanged, 
   User as FirebaseUser 
@@ -21,6 +22,12 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const isIOS = () => {
+    const ua = navigator?.userAgent || "";
+    const isiOSDevice = /iPad|iPhone|iPod/.test(ua);
+    const isTouchMac = ua.includes("Mac") && "ontouchend" in document;
+    return isiOSDevice || isTouchMac;
+  };
 
   // Checks mock mode status on mount or when changed externally
   useEffect(() => {
@@ -93,6 +100,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     try {
+      // iOS Safari/PWA cannot reliably open popups; use redirect there.
+      if (isIOS()) {
+        await signInWithRedirect(auth, googleProvider);
+        return;
+      }
+
       await signInWithPopup(auth, googleProvider);
     } catch (error: any) {
       console.error("Login Failed", error);
@@ -118,6 +131,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (confirmMock) {
         loginAsMockUser();
         return;
+      }
+
+      // Fallback to redirect if popup failed (covers popup_blocked and similar cases)
+      if (errorCode?.startsWith("auth/popup")) {
+        try {
+          await signInWithRedirect(auth, googleProvider);
+          return;
+        } catch (redirectError) {
+          console.error("Redirect login failed", redirectError);
+        }
       }
 
       // Specific advice

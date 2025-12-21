@@ -1,12 +1,13 @@
 {
   "name": "cloud-ledger",
   "private": true,
-  "version": "3.3.0",
+  "version": "3.3.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:unit": "vitest --run"
   },
   "dependencies": {
     "clsx": "^2.1.0",
@@ -32,11 +33,5 @@
     "@testing-library/user-event": "^14.4.3",
     "@testing-library/jest-dom": "^6.0.0",
     "jsdom": "^22.1.0"
-  },
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "test:unit": "vitest --run"
   }
 }
