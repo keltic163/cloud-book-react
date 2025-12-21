@@ -1,16 +1,17 @@
+import { describe, test, expect, beforeEach, vi } from 'vitest';
 import { validateKeyHandler } from '../src/index';
 
 // Mock defineSecret to return .value() reading from process.env
-jest.mock('firebase-functions/params', () => ({
+vi.mock('firebase-functions/params', () => ({
   defineSecret: (name: string) => ({
     value: () => process.env[name]
   })
 }));
 
 // Mock GoogleGenAI with behavior depending on provided API key
-jest.mock('@google/genai', () => {
+vi.mock('@google/genai', () => {
   return {
-    GoogleGenAI: jest.fn().mockImplementation(({ apiKey }: any) => ({
+    GoogleGenAI: vi.fn().mockImplementation(({ apiKey }: any) => ({
       apiKey,
       models: {
         generateContent: async ({ model }: any) => {
@@ -27,7 +28,7 @@ jest.mock('@google/genai', () => {
 
 describe('validateKeyHandler', () => {
   beforeEach(() => {
-    jest.resetModules();
+    vi.resetModules();
     process.env['GEMINI_API_KEY'] = 'server-secret-key';
     process.env['DEV_KEY_CODE'] = '6yhn%TGB';
   });

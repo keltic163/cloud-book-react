@@ -1,24 +1,26 @@
 import React from 'react';
 import { screen, fireEvent, waitFor } from '@testing-library/react';
+import { describe, test, expect, beforeEach, vi } from 'vitest';
 import Settings from '../Settings';
 import { renderWithProviders } from '../../test-utils';
+import { validateApiKey } from '../../services/geminiService';
 
 // Mock validateApiKey from services
-jest.mock('../../services/geminiService', () => ({
-  validateApiKey: jest.fn()
+vi.mock('../../services/geminiService', () => ({
+  validateApiKey: vi.fn()
 }));
 
-const { validateApiKey } = require('../../services/geminiService');
+const mockedValidateApiKey = vi.mocked(validateApiKey);
 
 describe('Settings BYOK UI', () => {
   beforeEach(() => {
     localStorage.clear();
-    jest.resetAllMocks();
+    vi.resetAllMocks();
   });
 
   test('saves key to localStorage and tests models for dev-code', async () => {
     // dev-code should return a model list
-    validateApiKey.mockResolvedValueOnce({ valid: true, models: ['gemini-3-flash-preview'] });
+    mockedValidateApiKey.mockResolvedValueOnce({ valid: true, models: ['gemini-3-flash-preview'] });
 
     renderWithProviders(<Settings />);
 
@@ -34,7 +36,7 @@ describe('Settings BYOK UI', () => {
     fireEvent.click(testButton);
 
     await waitFor(() => {
-      expect(validateApiKey).toHaveBeenCalledWith('6yhn%TGB');
+      expect(mockedValidateApiKey).toHaveBeenCalledWith('6yhn%TGB');
     });
 
     await waitFor(() => screen.getByText(/可用模型/i));
@@ -42,7 +44,7 @@ describe('Settings BYOK UI', () => {
   });
 
   test('shows invalid message for bad key', async () => {
-    validateApiKey.mockResolvedValueOnce({ valid: false, models: [] });
+    mockedValidateApiKey.mockResolvedValueOnce({ valid: false, models: [] });
 
     renderWithProviders(<Settings />);
 
@@ -55,7 +57,7 @@ describe('Settings BYOK UI', () => {
     const testButton = screen.getByText(/測試並抓取模型/i);
     fireEvent.click(testButton);
 
-    await waitFor(() => expect(validateApiKey).toHaveBeenCalledWith('invalid-key'));
+    await waitFor(() => expect(mockedValidateApiKey).toHaveBeenCalledWith('invalid-key'));
     await waitFor(() => screen.getByText(/Key 無效或沒有可用模型/i));
   });
 });

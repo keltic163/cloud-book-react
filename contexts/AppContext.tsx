@@ -59,7 +59,7 @@ interface AppContextType {
   isSyncing?: boolean;
 }
 
-const AppContext = createContext<AppContextType | undefined>(undefined);
+export const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const STORAGE_KEY_LEDGER_ID = 'cloudledger_ledger_id';
 const MOCK_STORAGE_KEY_TXS = 'cloudledger_mock_txs';
