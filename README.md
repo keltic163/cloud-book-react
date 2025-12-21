@@ -1,9 +1,10 @@
 ## 版本紀錄
 
 ### v3.3.1
-- iOS Google 登入改用 redirect，popup 失敗時自動轉向；Android 流程不變。
+- iOS Google 登入改用 redirect，popup 失敗會自動轉向；Android 流程不變。
 - 智慧輸入區新增提示：長按畫面下方的「+」可快速啟動語音辨識。
-- 版本號同步到 3.3.1。
+- 同步 UI 調整：主畫面右上角只保留同步按鈕，最後同步時間移到設定頁「資料同步」區塊並可手動同步。
+- 版本號更新至 3.3.1。
 
 ### v3.3.0
 - 混合同步（Hybrid Sync）。
@@ -32,13 +33,12 @@
 
 ## CI / 自動化測試 (GitHub Actions)
 PR 與推送到 `main` 會觸發 `.github/workflows/ci-tests.yml`。
-
 - `functions-tests`: `functions/` 的單元測試（Jest）與 Firebase Functions Emulator E2E (`npm run test:e2e`)。
 - `frontend-tests`: 前端單元測試（Vitest）。
 
 ### 必填 GitHub Secrets
 在 Settings → Secrets and variables → Actions 建立：
-- `GEMINI_API_KEY`: Emulator 測試用 Key（用測試用授權即可）。
+- `GEMINI_API_KEY`: Emulator 測試用 Key（用測試授權即可）。
 - `DEV_KEY_CODE`: 測試代碼（例：`6yhn%TGB`），CI 會放入 `functions/.secret.local` 提供 Emulator 使用。
 
 **安全注意**：勿將私密金鑰硬寫進版本庫；請用 Secrets 或 `.secret.local`。

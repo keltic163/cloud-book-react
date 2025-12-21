@@ -27,7 +27,7 @@ const ChartPieIcon = ({ className }: { className?: string }) => (
 
 // Sync control component (placed in header)
 const SyncControl: React.FC = () => {
-  const { syncTransactions, lastSyncedAt, isSyncing } = useAppContext();
+  const { syncTransactions, isSyncing } = useAppContext();
   const lastFocusRef = React.useRef(0);
 
   React.useEffect(() => {
@@ -43,18 +43,19 @@ const SyncControl: React.FC = () => {
     return () => window.removeEventListener('focus', handler);
   }, [syncTransactions]);
 
+  const label = isSyncing ? '同步中...' : '立即同步';
+
   return (
     <div className="flex items-center gap-2">
       <button
         onClick={() => syncTransactions && syncTransactions(true)}
-        className="flex items-center gap-2 px-3 py-1 rounded-md text-xs bg-white dark:bg-slate-700 hover:opacity-90 transition"
-        aria-label="立即同步"
-        title="立即同步"
+        className="flex items-center gap-1 px-3 py-1.5 rounded-md text-xs bg-white dark:bg-slate-700 hover:opacity-90 transition shadow-sm border border-slate-200 dark:border-slate-600"
+        aria-label={label}
+        title={label}
       >
         <svg className="w-4 h-4 text-slate-600 dark:text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12a9 9 0 1 0-3.16 6.36"/><path d="M21 12v-5"/></svg>
-        <span className="hidden sm:inline">{isSyncing ? '同步中...' : '立即同步'}</span>
+        <span className="text-[11px] font-medium">{label}</span>
       </button>
-      <span className="text-[11px] text-slate-400 hidden md:inline">{lastSyncedAt ? new Date(lastSyncedAt).toLocaleString() : '尚未同步'}</span>
     </div>
   );
 };
