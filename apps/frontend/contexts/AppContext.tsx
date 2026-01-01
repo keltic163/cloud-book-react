@@ -1,4 +1,4 @@
-﻿import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { Transaction, User, SavedLedger } from '../types';
 import { DEFAULT_EXPENSE_CATEGORIES, DEFAULT_INCOME_CATEGORIES } from '../constants';
 import { useAuth } from './AuthContext';
@@ -57,13 +57,16 @@ interface AppContextType {
   isDarkMode: boolean;
   toggleTheme: () => void;
   
-  // ??靽格嚗???臬??亙?憿?  expenseCategories: string[];
+  // ✅ 修改：拆分為支出與收入分類
+  expenseCategories: string[];
   incomeCategories: string[];
-  // type ??其????啣?/?芷?芯?蝔?  addCategory: (type: 'expense' | 'income', category: string) => Promise<void>;
+  // type 參數用來區分是新增/刪除哪一種
+  addCategory: (type: 'expense' | 'income', category: string) => Promise<void>;
   deleteCategory: (type: 'expense' | 'income', category: string) => Promise<void>;
   resetCategories: () => Promise<void>;
 
-  // ?啣?嚗?甇交??  syncTransactions: (forceFull?: boolean) => Promise<void>;
+  // 新增：同步控制
+  syncTransactions: (forceFull?: boolean) => Promise<void>;
   lastSyncedAt?: number;
   isSyncing?: boolean;
 }
@@ -85,7 +88,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
   
-  // ??靽格嚗?????  const [expenseCategories, setExpenseCategories] = useState<string[]>(DEFAULT_EXPENSE_CATEGORIES);
+  // ✅ 修改：拆分狀態
+  const [expenseCategories, setExpenseCategories] = useState<string[]>(DEFAULT_EXPENSE_CATEGORIES);
   const [incomeCategories, setIncomeCategories] = useState<string[]>(DEFAULT_INCOME_CATEGORIES);
 
   // Sync state
@@ -95,7 +99,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Local fallback state
   const [localUsers, setLocalUsers] = useState<User[]>([{
     uid: 'local_user',
-    displayName: '閮芸恥',
+    displayName: '訪客',
     email: null,
     photoURL: null,
     color: 'bg-blue-500'
@@ -171,7 +175,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (isMockMode) {
         setUsers([
           { uid: authUser.uid, displayName: authUser.displayName, email: authUser.email, photoURL: authUser.photoURL, color: 'bg-indigo-500' },
-          { uid: 'mock-partner', displayName: '?虫???(蝭?)', email: 'partner@demo.com', photoURL: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Annie', color: 'bg-pink-500' }
+          { uid: 'mock-partner', displayName: '另一半 (範例)', email: 'partner@demo.com', photoURL: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Annie', color: 'bg-pink-500' }
         ]);
 
         const profileStr = localStorage.getItem(MOCK_STORAGE_KEY_USER_PROFILE);
@@ -183,7 +187,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
            targetLedgerId = 'mock-ledger-demo';
            profile = { 
              lastLedgerId: targetLedgerId, 
-             savedLedgers: [{ id: targetLedgerId, alias: '??蝭?撣單', lastAccessedAt: Date.now() }] 
+             savedLedgers: [{ id: targetLedgerId, alias: '我的範例帳本', lastAccessedAt: Date.now() }] 
            };
            localStorage.setItem(MOCK_STORAGE_KEY_USER_PROFILE, JSON.stringify(profile));
         }
@@ -234,7 +238,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
              if (ledgerSnap.exists()) {
                 setLedgerId(targetId);
                 if (!currentSavedLedgers.find(l => l.id === targetId)) {
-                   const newList = [...currentSavedLedgers, { id: targetId, alias: ledgerSnap.data().name || '?芸?董??, lastAccessedAt: Date.now() }];
+                   const newList = [...currentSavedLedgers, { id: targetId, alias: ledgerSnap.data().name || '未命名帳本', lastAccessedAt: Date.now() }];
                    setSavedLedgers(newList);
                    await syncUserProfile(authUser.uid, { lastLedgerId: targetId, savedLedgers: newList });
                 } else {
@@ -288,7 +292,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
              photoURL: user.photoURL,
              email: user.email
           }],
-          // ??靽格嚗?憪?撖怠????憿?          expenseCategories: DEFAULT_EXPENSE_CATEGORIES,
+          // ✅ 修改：初始化寫入分開的分類
+          expenseCategories: DEFAULT_EXPENSE_CATEGORIES,
           incomeCategories: DEFAULT_INCOME_CATEGORIES
         };
         await setDoc(newLedgerRef, newLedgerData);
@@ -303,7 +308,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         localStorage.setItem(STORAGE_KEY_LEDGER_ID, newLedgerRef.id);
       } catch (e: any) {
         console.error("Create ledger failed:", e);
-        alert("撱箇?撣單憭望?: " + e.message);
+        alert("建立帳本失敗: " + e.message);
       }
   };
 
@@ -438,7 +443,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // --- Actions ---
 
-  // ??靽格嚗憓?憿?(???type)
+  // ✅ 修改：新增分類 (區分 type)
   const addCategory = async (type: 'expense' | 'income', category: string) => {
     if (!ledgerId || !db || isMockMode) return;
     
@@ -455,7 +460,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
-  // ??靽格嚗?文?憿?(???type)
+  // ✅ 修改：刪除分類 (區分 type)
   const deleteCategory = async (type: 'expense' | 'income', category: string) => {
     if (!ledgerId || !db || isMockMode) return;
     
@@ -470,7 +475,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
-  // ??靽格嚗?蝵桀?憿?  const resetCategories = async () => {
+  // ✅ 修改：重置分類
+  const resetCategories = async () => {
     if (!ledgerId || !db || isMockMode) return;
     
     setExpenseCategories(DEFAULT_EXPENSE_CATEGORIES);
@@ -484,7 +490,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const createLedger = async (name: string) => {
       if (!authUser) return;
       if (isMockMode) {
-          alert("瞍內璅∪?銝瘜遣蝡??董?研?);
+          alert("演示模式下無法建立多個帳本。");
           return;
       }
       await createNewLedgerInternal(authUser, name, savedLedgers);
@@ -548,7 +554,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setSavedLedgers(newSaved);
         if (id === ledgerId) {
             if (newSaved.length > 0) switchLedger(newSaved[0].id);
-            else alert("?瞍內璅∪??敺??董?穿??⊥???箝?);
+            else alert("這是演示模式最後一個帳本，無法退出。");
         }
         return;
     }
@@ -576,7 +582,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
     } catch (e: any) {
         console.error("Leave ledger failed:", e);
-        alert("??箏董?砍仃?? " + e.message);
+        alert("退出帳本失敗: " + e.message);
     }
   };
 
@@ -589,7 +595,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
 const joinLedger = async (id: string): Promise<boolean> => {
      if (isMockMode) {
-       alert("瞍內璅∪?銝瘜?甇亦?撖西???);
+       alert("演示模式下無法同步真實資料。");
        setLedgerId(id);
        return true;
      }
@@ -604,7 +610,7 @@ const joinLedger = async (id: string): Promise<boolean> => {
 
        const newEntry: SavedLedger = { 
            id: id, 
-           alias: data.ledgerName || '撌脣??亦?撣單', 
+           alias: data.ledgerName || '已加入的帳本', 
            lastAccessedAt: Date.now() 
        };
        
@@ -622,7 +628,7 @@ const joinLedger = async (id: string): Promise<boolean> => {
        return true;
      } catch (e: any) {
        console.error(e);
-       alert(`?撣單憭望?嚗?{e.message}`);
+       alert(`加入帳本失敗：${e.message}`);
        return false;
      }
   };
@@ -738,7 +744,8 @@ const joinLedger = async (id: string): Promise<boolean> => {
       isDarkMode,
       toggleTheme,
       
-      // ??撠?啣???      expenseCategories,
+      // ✅ 導出新功能
+      expenseCategories,
       incomeCategories,
       addCategory,
       deleteCategory,

@@ -50,7 +50,8 @@ const Dashboard = () => {
     return { income, expense, balance: income - expense };
   }, [transactions, currentDate]);
 
-  // ??靽格嚗?蝞??擖??風?脩蜇????  // ?ㄐ雿輻 currentDate嚗?隞亦雿???隞賣?嚗??擖?????
+  // ✅ 修改：計算「本月回饋」與「歷史總回饋」
+  // 這裡使用 currentDate，所以當你切換月份時，本月回饋也會跟著變
   const rewardStats = useMemo(() => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
@@ -61,9 +62,10 @@ const Dashboard = () => {
     transactions.forEach(t => {
       const reward = t.rewards || 0;
       if (reward > 0) {
-        // 1. 蝝臬??唳風?脩蜇憿?        totalRewards += reward;
+        // 1. 累加到歷史總額
+        totalRewards += reward;
 
-        // 2. 瑼Ｘ?臬?箇?炎閬??遢
+        // 2. 檢查是否為當前檢視的月份
         const tDate = new Date(t.date);
         if (tDate.getFullYear() === year && tDate.getMonth() === month) {
           monthRewards += reward;
@@ -198,13 +200,13 @@ const Dashboard = () => {
   
   const getCategoryColor = (cat: string) => {
     switch (cat) {
-      case '擗ㄡ': return 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400';
-      case '鈭日?: return 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400';
-      case '鞈潛': return 'bg-pink-100 text-pink-600 dark:bg-pink-900/30 dark:text-pink-400';
-      case '撅?': return 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400';
-      case '?芾?': return 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400';
-      case '憡?': return 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400';
-      case '??': return 'bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-400';
+      case '餐飲': return 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400';
+      case '交通': return 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400';
+      case '購物': return 'bg-pink-100 text-pink-600 dark:bg-pink-900/30 dark:text-pink-400';
+      case '居住': return 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400';
+      case '薪資': return 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400';
+      case '娛樂': return 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400';
+      case '投資': return 'bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-400';
       default: return 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300';
     }
   };
@@ -217,18 +219,18 @@ const Dashboard = () => {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10 relative">
       
-      {/* 頝收??(?銝) */}
+      {/* 跑馬燈 (最上方) */}
       <SystemAnnouncement />
 
       {/* Calendar View */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-100 dark:border-slate-800 relative z-0 transition-colors">
         <div className="flex items-center justify-between mb-4 px-1">
-           <h3 className="font-bold text-slate-800 dark:text-white">?嗆?交?</h3>
+           <h3 className="font-bold text-slate-800 dark:text-white">收支日曆</h3>
            <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800 rounded-lg p-1">
              <button 
                onClick={() => changeMonth(-1)} 
                className="p-1 hover:bg-white dark:hover:bg-slate-700 rounded-md transition-colors text-slate-500 dark:text-slate-400"
-               aria-label="銝???
+               aria-label="上一月"
              >
                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
              </button>
@@ -236,7 +238,7 @@ const Dashboard = () => {
              <button 
                onClick={() => changeMonth(1)} 
                className="p-1 hover:bg-white dark:hover:bg-slate-700 rounded-md transition-colors text-slate-500 dark:text-slate-400"
-               aria-label="銝???
+               aria-label="下一月"
              >
                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
              </button>
@@ -246,7 +248,7 @@ const Dashboard = () => {
         </div>
 
         <div className="grid grid-cols-7 gap-1 text-center mb-2" role="rowgroup">
-           {['??, '銝', '鈭?, '銝?, '??, '鈭?, '??].map(d => (
+           {['日', '一', '二', '三', '四', '五', '六'].map(d => (
              <div key={d} className="text-xs text-slate-400 font-medium" role="columnheader">{d}</div>
            ))}
         </div>
@@ -270,7 +272,7 @@ const Dashboard = () => {
                     ${!isSelected && !isToday ? 'bg-white border-slate-50 hover:border-slate-300 dark:bg-slate-800 dark:border-slate-700 dark:hover:border-slate-600' : ''}
                  `}
                  role="gridcell"
-                 aria-label={`${currentDate.getMonth() + 1}??{item.day}?? ?嗅 ${item.data.income}?? ?臬 ${item.data.expense}?}
+                 aria-label={`${currentDate.getMonth() + 1}月${item.day}日, 收入 ${item.data.income}元, 支出 ${item.data.expense}元`}
                  aria-current={isToday ? 'date' : undefined}
                  tabIndex={0}
                >
@@ -300,22 +302,23 @@ const Dashboard = () => {
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
         role="region"
-        aria-label={`${currentDate.getMonth() + 1}???Ｚ??}
+        aria-label={`${currentDate.getMonth() + 1}月資產變化`}
       >
         <div className="flex items-center justify-between mb-1"> 
           <button 
             onClick={() => changeMonth(-1)} 
             className="p-1 text-slate-400 hover:text-white rounded-md transition-colors"
-            aria-label="銝???
+            aria-label="上一月"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
           </button>
           <h2 className="text-slate-400 text-sm font-medium">
-            {currentDate.getMonth() + 1}???Ｚ???          </h2>
+            {currentDate.getMonth() + 1}月資產變化
+          </h2>
           <button 
             onClick={() => changeMonth(1)} 
             className="p-1 text-slate-400 hover:text-white rounded-md transition-colors"
-            aria-label="銝???
+            aria-label="下一月"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
           </button>
@@ -328,44 +331,44 @@ const Dashboard = () => {
           <div>
             <div className="flex items-center gap-1.5 text-slate-400 mb-0.5">
               <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-              <span className="text-xs font-semibold uppercase tracking-wider">?祆??嗅</span>
+              <span className="text-xs font-semibold uppercase tracking-wider">本月收入</span>
             </div>
-            <div className="text-lg font-semibold text-white" aria-label={`?祆??嗅 ${monthlyStats.income.toLocaleString()}?}>${monthlyStats.income.toLocaleString()}</div>
+            <div className="text-lg font-semibold text-white" aria-label={`本月收入 ${monthlyStats.income.toLocaleString()}元`}>${monthlyStats.income.toLocaleString()}</div>
           </div>
           <div>
             <div className="flex items-center gap-1.5 text-slate-400 mb-0.5">
               <div className="w-2 h-2 rounded-full bg-rose-500"></div>
-              <span className="text-xs font-semibold uppercase tracking-wider">?祆??臬</span>
+              <span className="text-xs font-semibold uppercase tracking-wider">本月支出</span>
             </div>
-            <div className="text-lg font-semibold text-white" aria-label={`?祆??臬 ${monthlyStats.expense.toLocaleString()}?}>${monthlyStats.expense.toLocaleString()}</div>
+            <div className="text-lg font-semibold text-white" aria-label={`本月支出 ${monthlyStats.expense.toLocaleString()}元`}>${monthlyStats.expense.toLocaleString()}</div>
           </div>
         </div>
       </div>
 
-      {/* ??Rewards Card (撌脫?啁嚗蜓憿舐內?祆???嚗憿舐內甇瑕蝝舐?) */}
-      <div className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 p-5 rounded-2xl border border-amber-100 dark:border-amber-800/30 shadow-sm" role="region" aria-label="靽∠?∪?擖絞閮?>
+      {/* ✅ Rewards Card (已更新為：主顯示本月回饋，副顯示歷史累積) */}
+      <div className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 p-5 rounded-2xl border border-amber-100 dark:border-amber-800/30 shadow-sm" role="region" aria-label="信用卡回饋統計">
         <div className="flex items-center gap-3 mb-2">
           <div className="p-2 bg-amber-100 dark:bg-amber-800 rounded-lg text-amber-600 dark:text-amber-300">
             <SparklesIcon className="w-5 h-5" />
           </div>
           <span className="text-sm font-medium text-amber-800 dark:text-amber-200">
-            暺?
+            點券折抵
           </span>
         </div>
         
-        {/* 銝餉??詨?嚗??擖?*/}
+        {/* 主要數字：本月回饋 */}
         <div className="flex items-baseline gap-1">
           <span className="text-2xl font-bold text-amber-700 dark:text-amber-400">
             ${rewardStats.monthRewards.toLocaleString()}
           </span>
           <span className="text-xs text-amber-600/70 dark:text-amber-500/70 font-medium">
-            ({currentDate.getMonth() + 1}??
+            ({currentDate.getMonth() + 1}月)
           </span>
         </div>
 
-        {/* 甈∟??詨?嚗風?脩蜇閮?*/}
+        {/* 次要數字：歷史總計 */}
         <div className="mt-1 text-xs text-amber-600/60 dark:text-amber-500/60 font-medium">
-          甇瑕蝝航?: ${rewardStats.totalRewards.toLocaleString()}
+          歷史累計: ${rewardStats.totalRewards.toLocaleString()}
         </div>
       </div>
 
@@ -377,7 +380,7 @@ const Dashboard = () => {
                 className="fixed inset-0 bg-black/30 backdrop-blur-[1px] z-[40]"
                 onClick={() => setSelectedDay(null)}
                 role="button"
-                aria-label="???乩漱?底??
+                aria-label="關閉日交易詳情"
                 tabIndex={-1}
             ></div>
             
@@ -404,14 +407,16 @@ const Dashboard = () => {
                         <div className="flex items-center justify-between pointer-events-auto cursor-auto">
                             <div>
                                 <h3 id="day-detail-title" className="text-lg font-bold text-slate-800 dark:text-white">
-                                    {currentDate.getMonth() + 1}??{selectedDay}??                                </h3>
+                                    {currentDate.getMonth() + 1}月 {selectedDay}日
+                                </h3>
                                 <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                                    {selectedDayTransactions.length} 蝑漱??                                </p>
+                                    {selectedDayTransactions.length} 筆交易
+                                </p>
                             </div>
                             <button 
                                 onClick={() => setSelectedDay(null)}
                                 className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-                                aria-label="??"
+                                aria-label="關閉"
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                             </button>
@@ -431,7 +436,7 @@ const Dashboard = () => {
                                             onClick={() => setEditingTxId(t.id)}
                                             className="group relative bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between transition-all active:scale-[0.98] cursor-pointer"
                                             role="listitem"
-                                            aria-label={`${t.description}嚗?憿?${isExpense ? '-' : '+'}${t.amount.toLocaleString()}????${user?.displayName || '?芰雿輻??} 閮?`}
+                                            aria-label={`${t.description}，金額 ${isExpense ? '-' : '+'}${t.amount.toLocaleString()}元，由 ${user?.displayName || '未知使用者'} 記錄`}
                                             tabIndex={0}
                                         >
                                             <div className="flex items-center gap-3">
@@ -443,7 +448,7 @@ const Dashboard = () => {
                                                     <div className="flex items-center gap-2 mt-0.5">
                                                         <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">{t.category}</span>
                                                         {t.rewards > 0 && (
-                                                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400" aria-label={`?? ${t.rewards}暺??}>
+                                                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400" aria-label={`回饋 ${t.rewards}點或元`}>
                                                                 +{t.rewards}
                                                             </span>
                                                         )}
@@ -457,7 +462,7 @@ const Dashboard = () => {
                                                 </div>
                                                 <div className="flex justify-end mt-1">
                                                     {user && (
-                                                        <img src={user.photoURL || ''} alt={user.displayName || ''} className="w-4 h-4 rounded-full ring-1 ring-white dark:ring-slate-700 bg-slate-200 dark:bg-slate-600" title={`閮???${user.displayName || '閮芸恥'}`} />
+                                                        <img src={user.photoURL || ''} alt={user.displayName || ''} className="w-4 h-4 rounded-full ring-1 ring-white dark:ring-slate-700 bg-slate-200 dark:bg-slate-600" title={`記錄者：${user.displayName || '訪客'}`} />
                                                     )}
                                                 </div>
                                             </div>
@@ -467,7 +472,7 @@ const Dashboard = () => {
                             </div>
                         ) : (
                             <div className="flex flex-col items-center justify-center h-full text-slate-400">
-                                <p>?嗆?∩漱????/p>
+                                <p>當日無交易紀錄</p>
                             </div>
                         )}
                     </div>

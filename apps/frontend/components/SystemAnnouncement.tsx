@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { SystemAnnouncement as AnnouncementType } from '../types';
@@ -51,13 +51,13 @@ const SystemAnnouncement = () => {
   };
 
   return (
-    // 憭惜摰孵
+    // 外層容器
     <div className={`${getColors()} overflow-hidden py-2 shadow-md relative z-50`}>
       <div className="flex items-center w-full">
         
-        {/* ???ㄐ????憛歇蝘駁 */}
+        {/* ❌ 這裡原本的「公告」區塊已移除 */}
 
-        {/* 頝收?????(?曉雿遛撖砍漲) */}
+        {/* 跑馬燈捲動區域 (現在佔滿寬度) */}
         <div className="flex-1 overflow-hidden relative h-6 w-full">
            <div className="whitespace-nowrap absolute animate-marquee top-0 left-full">
               <span className="text-sm font-medium px-4 inline-block">

@@ -18,11 +18,11 @@ const OnboardingScreen: React.FC = () => {
     setError(null);
     setBusy(true);
     try {
-      const name = ledgerName.trim() || '??撣單';
+      const name = ledgerName.trim() || '未命名帳本';
       await createLedger(name);
     } catch (e) {
       console.error('Create ledger failed:', e);
-      setError('撱箇?撣單憭望?嚗?蝔??岫??);
+      setError('建立帳本失敗，請稍後再試。');
     } finally {
       setBusy(false);
     }
@@ -32,7 +32,7 @@ const OnboardingScreen: React.FC = () => {
     if (busy) return;
     const code = inviteCode.trim();
     if (!code) {
-      setError('隢撓?仿?隢Ⅳ??);
+      setError('請輸入邀請碼。');
       return;
     }
     setError(null);
@@ -40,11 +40,11 @@ const OnboardingScreen: React.FC = () => {
     try {
       const ok = await joinLedger(code);
       if (!ok) {
-        setError('?曆??啣董?祆?瘝?甈???);
+        setError('加入帳本失敗，請確認邀請碼是否正確。');
       }
     } catch (e) {
       console.error('Join ledger failed:', e);
-      setError('?撣單憭望?嚗?蝔??岫??);
+      setError('加入帳本失敗，請稍後再試。');
     } finally {
       setBusy(false);
     }
@@ -58,7 +58,7 @@ const OnboardingScreen: React.FC = () => {
       await switchLedger(id);
     } catch (e) {
       console.error('Switch ledger failed:', e);
-      setError('??撣單憭望?嚗?蝔??岫??);
+      setError('切換帳本失敗，請稍後再試。');
     } finally {
       setBusy(false);
     }
@@ -69,17 +69,18 @@ const OnboardingScreen: React.FC = () => {
       <div className="w-full max-w-md bg-white/90 backdrop-blur rounded-2xl shadow-xl p-6 sm:p-8">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center font-bold text-xl shadow-md">
-            ??          </div>
+            CL
+          </div>
           <div>
-            <h1 className="text-xl font-bold">??雿輻 CloudLedger</h1>
-            <p className="text-sm text-slate-500">撱箇??啣董?祆???暹?撣單</p>
+            <h1 className="text-xl font-bold">開始使用 CloudLedger</h1>
+            <p className="text-sm text-slate-500">建立新帳本或加入現有帳本</p>
           </div>
         </div>
 
         <div className="space-y-4">
           {savedLedgers.length > 0 && (
             <div className="rounded-xl border border-slate-200 p-4">
-              <h2 className="text-sm font-semibold text-slate-700 mb-2">?豢??函?撣單</h2>
+              <h2 className="text-sm font-semibold text-slate-700 mb-2">選擇現有帳本</h2>
               <div className="space-y-2">
                 {savedLedgers.map((ledger) => (
                   <button
@@ -92,7 +93,7 @@ const OnboardingScreen: React.FC = () => {
                       <div className="text-sm font-semibold text-slate-800">{ledger.alias}</div>
                       <div className="text-[11px] text-slate-400 font-mono truncate max-w-[220px]">ID: {ledger.id}</div>
                     </div>
-                    <span className="text-xs text-slate-500">?脣</span>
+                    <span className="text-xs text-slate-500">切換</span>
                   </button>
                 ))}
               </div>
@@ -101,17 +102,36 @@ const OnboardingScreen: React.FC = () => {
                 onClick={() => setShowJoin((v) => !v)}
                 className="mt-3 text-xs text-slate-500 hover:text-slate-700"
               >
-                {showJoin ? '?嗉絲?隢Ⅳ頛詨' : '???隢Ⅳ'}
+                {showJoin ? '隱藏加入帳本' : '顯示加入帳本'}
+              </button>
+            </div>
+          )}
+
+          {(showJoin || savedLedgers.length === 0) && (
+            <div className="rounded-xl border border-slate-200 p-4">
+              <h2 className="text-sm font-semibold text-slate-700 mb-2">加入帳本</h2>
+              <input
+                value={inviteCode}
+                onChange={(e) => setInviteCode(e.target.value)}
+                placeholder="輸入邀請碼"
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+              />
+              <button
+                onClick={handleJoin}
+                disabled={busy}
+                className="mt-3 w-full bg-slate-800 text-white py-2.5 rounded-lg font-semibold text-sm hover:bg-slate-900 transition disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                加入帳本
               </button>
             </div>
           )}
 
           <div className="rounded-xl border border-slate-200 p-4">
-            <h2 className="text-sm font-semibold text-slate-700 mb-2">撱箇??啣董??/h2>
+            <h2 className="text-sm font-semibold text-slate-700 mb-2">建立新帳本</h2>
             <input
               value={ledgerName}
               onChange={(e) => setLedgerName(e.target.value)}
-              placeholder="撣單?迂嚗?征嚗?
+              placeholder="帳本名稱（可留空）"
               className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
             />
             <button
@@ -119,38 +139,16 @@ const OnboardingScreen: React.FC = () => {
               disabled={busy}
               className="mt-3 w-full bg-amber-500 text-white py-2.5 rounded-lg font-semibold text-sm hover:bg-amber-600 transition disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {busy ? '??銝?..' : '撱箇?撣單'}
+              建立帳本
             </button>
           </div>
 
-          {(savedLedgers.length === 0 || showJoin) && (
-            <div className="rounded-xl border border-slate-200 p-4">
-              <h2 className="text-sm font-semibold text-slate-700 mb-2">??暹?撣單</h2>
-              <input
-                value={inviteCode}
-                onChange={(e) => setInviteCode(e.target.value)}
-                placeholder="頛詨?隢Ⅳ"
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
-              />
-              <button
-                onClick={handleJoin}
-                disabled={busy}
-                className="mt-3 w-full bg-sky-500 text-white py-2.5 rounded-lg font-semibold text-sm hover:bg-sky-600 transition disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {busy ? '??銝?..' : '?撣單'}
-              </button>
-            </div>
-          )}
-
           {error && (
-            <div className="rounded-lg bg-rose-50 text-rose-700 text-sm px-3 py-2">
+            <div className="text-sm text-rose-600 bg-rose-50 border border-rose-100 px-3 py-2 rounded-lg">
               {error}
             </div>
           )}
         </div>
-
-        <p className="mt-5 text-xs text-slate-400">
-          ?身摰??Ｙ瘜??摰?敺?舫?憪蝙?具?        </p>
       </div>
     </div>
   );

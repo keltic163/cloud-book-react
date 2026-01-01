@@ -12,5 +12,8 @@
     "test:frontend": "npm --prefix apps/frontend run test:unit",
     "dev:admin": "npm --prefix apps/admin run dev",
     "build:admin": "npm --prefix apps/admin run build"
+  },
+  "devDependencies": {
+    "firebase-tools": "^15.1.0"
   }
 }

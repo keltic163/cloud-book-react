@@ -1,14 +1,14 @@
-﻿import path from 'path';
+import path from 'path';
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
-// ??1. ?啣?嚗???PWA 憭?
+// ✅ 1. 新增：引入 PWA 外掛
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(({ mode }) => {
   
   const env = loadEnv(mode, '.', '');
   return {
-    // ???耨?寥ㄐ?irebase ?函蔡?冽?桅?嚗?隞亥??孵? '/'
+    // 👇【修改這裡】Firebase 部署在根目錄，所以要改回 '/'
     base: '/',
 
     server: {
@@ -16,19 +16,20 @@ export default defineConfig(({ mode }) => {
       host: '0.0.0.0',
     },
     
-    // ??2. 靽格嚗 plugins ???銝剖???VitePWA 閮剖?
+    // ✅ 2. 修改：在 plugins 陣列中加入 VitePWA 設定
     plugins: [
       react(),
       VitePWA({
         registerType: 'autoUpdate',
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'favicon.svg'],
         manifest: {
-          name: 'CloudLedger ?脰?',
+          name: 'CloudLedger 雲記',
           short_name: 'CloudLedger',
-          description: '?函??脩垢?箸閮董?拇?',
+          description: '您的雲端智慧記帳助手',
           theme_color: '#ffffff',
           background_color: '#000000ff',
-          display: 'standalone', // 霈?璈?蝬脩??嗆? App ??????          scope: '/',
+          display: 'standalone', // 讓手機把網站當成 App 開啟的關鍵
+          scope: '/',
           start_url: '/',
           icons: [
             {
@@ -48,7 +49,8 @@ export default defineConfig(({ mode }) => {
       })
     ],
 
-    // ?? ?酉嚗??AI ?摩撌脩?蝘餃敺垢嚗?蝡臬撖虫???閬? KEY 鈭?    // 雿鈭?憭芸??梯正?梢嚗挾??????
+    // ⚠️ 備註：既然 AI 邏輯已經移到後端，前端其實不再需要這些 KEY 了
+    // 但為了避免改太多東西報錯，這段先留著沒關係
     define: {
       'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)

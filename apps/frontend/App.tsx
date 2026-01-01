@@ -44,7 +44,7 @@ const SyncControl: React.FC = () => {
     return () => window.removeEventListener('focus', handler);
   }, [syncTransactions]);
 
-  const label = isSyncing ? '?郊銝?..' : '蝡?郊';
+  const label = isSyncing ? '同步中...' : '立即同步';
 
   return (
     <div className="flex items-center gap-2">
@@ -65,19 +65,20 @@ const Layout = () => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'add' | 'list' | 'settings' | 'stats'>('dashboard');
   const [voiceAutoStart, setVoiceAutoStart] = useState(false);
   const pressTimerRef = React.useRef<number | null>(null);
-  const { currentUser } = useAppContext(); 
+  const { currentUser } = useAppContext();
 
   const startPress = () => {
-    // 700ms ?瑟??文?
+    // 700ms 長按
     if (pressTimerRef.current) window.clearTimeout(pressTimerRef.current);
     pressTimerRef.current = window.setTimeout(() => {
-      // ?瑟???嚗炎?交?西身摰? API Key 銝血???      const key = localStorage.getItem('user_gemini_key');
+      // 長按時：檢查是否設定 API Key 並啟用 AI
+      const key = localStorage.getItem('user_gemini_key');
       const enabled = localStorage.getItem('user_gemini_enabled') === '1';
       if (key && enabled) {
         setVoiceAutoStart(true);
         setActiveTab('add');
       } else {
-        const go = window.confirm('撠閮剖? API Key ?? AI嚗?衣?典?敺閮剖???');
+        const go = window.confirm('尚未設定 API Key 或未啟用 AI，是否前往設定？');
         if (go) setActiveTab('settings');
       }
     }, 700);
@@ -92,12 +93,11 @@ const Layout = () => {
 
   const endPress = () => {
     if (pressTimerRef.current) {
-      // ?剜? (?芷? 700ms) -> 甇?虜銵 (??onClick ??????add)
+      // 短按 (小於 700ms) -> 正常 onClick 行為
       window.clearTimeout(pressTimerRef.current);
       pressTimerRef.current = null;
     } else {
-      // 憒? timer 撌脩?閫貊嚗??嚗??蔭 flag嚗 AddTransaction mount ??霈??
-      // Reset after a short delay so AddTransaction can see the flag
+      // 若 timer 已觸發（長按），延遲重置 flag 讓 AddTransaction 讀取
       setTimeout(() => setVoiceAutoStart(false), 1000);
     }
   };
@@ -107,25 +107,25 @@ const Layout = () => {
       {/* Top Header */}
       <header className="bg-white dark:bg-slate-900 shadow-sm border-b border-transparent dark:border-slate-800 px-4 py-4 sticky top-0 z-[800] flex justify-between items-center transition-colors">
         <div className="flex items-center gap-2">
-          <img 
-                src="/apple-touch-icon.png" 
-                alt="Logo" 
-                className="w-10 h-10 rounded-xl shadow-lg shadow-indigo-200 dark:shadow-none" 
-              />
-          <h1 className="text-xl font-bold text-slate-800 dark:text-white tracking-tight">CloudLedger ?脰?</h1>
+          <img
+            src="/apple-touch-icon.png"
+            alt="Logo"
+            className="w-10 h-10 rounded-xl shadow-lg shadow-indigo-200 dark:shadow-none"
+          />
+          <h1 className="text-xl font-bold text-slate-800 dark:text-white tracking-tight">CloudLedger 雲記</h1>
         </div>
-        
+
         <div className="relative flex items-center gap-3">
           {/* Sync button (moved from Dashboard) */}
           {/* Shows on larger screens; on small screens it's an icon only */}
           <SyncControl />
 
-          <button 
+          <button
             onClick={() => setActiveTab('settings')}
             className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
           >
             <img src={currentUser?.photoURL || 'https://api.dicebear.com/7.x/avataaars/svg?seed=placeholder'} alt={currentUser?.displayName || 'Guest'} className="w-6 h-6 rounded-full bg-white dark:bg-slate-700 object-cover" />
-            <span className="text-sm font-medium hidden sm:inline dark:text-slate-200">{currentUser?.displayName || '閮芸恥'}</span>
+            <span className="text-sm font-medium hidden sm:inline dark:text-slate-200">{currentUser?.displayName || '訪客'}</span>
           </button>
         </div>
       </header>
@@ -133,7 +133,7 @@ const Layout = () => {
       {/* Main Content */}
       <main className="max-w-md mx-auto p-4 sm:p-6">
         {activeTab === 'dashboard' && <Dashboard />}
-        {activeTab === 'add' && <AddTransaction autoStartVoice={voiceAutoStart} onComplete={() => { setActiveTab('dashboard'); setVoiceAutoStart(false); }} /> }
+        {activeTab === 'add' && <AddTransaction autoStartVoice={voiceAutoStart} onComplete={() => { setActiveTab('dashboard'); setVoiceAutoStart(false); }} />}
         {activeTab === 'list' && <TransactionList />}
         {activeTab === 'stats' && <Statistics />}
         {activeTab === 'settings' && <Settings />}
@@ -141,23 +141,23 @@ const Layout = () => {
 
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 px-2 py-2 flex justify-between items-center z-50 safe-area-bottom max-w-md mx-auto transition-colors">
-        <button 
+        <button
           onClick={() => setActiveTab('dashboard')}
           className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-colors flex-1 ${activeTab === 'dashboard' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`}
         >
           <HomeIcon className="w-5 h-5 sm:w-6 sm:h-6" />
-          <span className="text-[10px] font-medium">擐?</span>
+          <span className="text-[10px] font-medium">首頁</span>
         </button>
-        
-        <button 
+
+        <button
           onClick={() => setActiveTab('list')}
           className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-colors flex-1 ${activeTab === 'list' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`}
         >
           <ListIcon className="w-5 h-5 sm:w-6 sm:h-6" />
-          <span className="text-[10px] font-medium">蝝??/span>
+          <span className="text-[10px] font-medium">紀錄</span>
         </button>
 
-        <button 
+        <button
           onClick={() => setActiveTab('add')}
           onMouseDown={() => startPress()}
           onMouseUp={() => endPress()}
@@ -169,23 +169,23 @@ const Layout = () => {
           <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center shadow-lg transition-transform hover:scale-105 ${activeTab === 'add' ? 'bg-indigo-700 text-white shadow-indigo-500/50' : 'bg-indigo-600 text-white'}`}>
             <PlusCircleIcon className="w-6 h-6 sm:w-8 sm:h-8" />
           </div>
-          <span className={`text-[10px] font-medium ${activeTab === 'add' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500'}`}>閮董</span>
+          <span className={`text-[10px] font-medium ${activeTab === 'add' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500'}`}>記帳</span>
         </button>
 
-        <button 
+        <button
           onClick={() => setActiveTab('stats')}
           className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-colors flex-1 ${activeTab === 'stats' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`}
         >
           <ChartPieIcon className="w-5 h-5 sm:w-6 sm:h-6" />
-          <span className="text-[10px] font-medium">蝯梯?</span>
+          <span className="text-[10px] font-medium">統計</span>
         </button>
-        
-        <button 
+
+        <button
           onClick={() => setActiveTab('settings')}
           className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-colors flex-1 ${activeTab === 'settings' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`}
         >
           <SettingsIcon className="w-5 h-5 sm:w-6 sm:h-6" />
-          <span className="text-[10px] font-medium">閮剖?</span>
+          <span className="text-[10px] font-medium">設定</span>
         </button>
       </nav>
     </div>
@@ -215,7 +215,7 @@ const AppGate = () => {
   if (isInitializing) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-600">
-        頛銝?..
+        載入中...
       </div>
     );
   }

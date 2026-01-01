@@ -1,11 +1,10 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { parseSmartInput } from '../services/geminiService';
 import { TransactionType } from '../types';
-// ???啣? Mic, MicOff, Wand2 ?內
-import { Mic, MicOff, Check, Wand2 } from 'lucide-react'; 
+import { Mic, MicOff, Check, Wand2 } from 'lucide-react';
 
-// ?游? window ?拐辣隞交?渡汗?刻???API
+// Speech recognition support for browsers
 declare global {
   interface Window {
     webkitSpeechRecognition: any;
@@ -18,12 +17,8 @@ const MagicWandIcon = ({ className }: { className?: string }) => (
 );
 
 const CheckIcon = ({ className }: { className?: string }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="20 6 9 17 4 12"/></svg>
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="20 6 9 17 4 12"/></svg>
 );
-
-interface Props {
-  onComplete: () => void;
-}
 
 interface Props {
   onComplete: () => void;
@@ -31,48 +26,40 @@ interface Props {
 }
 
 const AddTransaction: React.FC<Props> = ({ onComplete, autoStartVoice = false }) => {
-  // 1. 敺?AppContext ???
-  const { addTransaction, createRecurringTemplate, currentUser, ledgerId, selectedDate, expenseCategories, incomeCategories } = useAppContext();
-  // ?箸頛詨?臬撌脣??剁???Settings ?批銝血???localStorage嚗?  const [isAIEnabled, setIsAIEnabled] = useState<boolean>(() => {
-    return localStorage.getItem('user_gemini_enabled') === '1';
-  });
+  const { addTransaction, createRecurringTemplate, currentUser, ledgerId, selectedDate, expenseCategories, incomeCategories, users = [] } = useAppContext();
+  const [isAIEnabled, setIsAIEnabled] = useState<boolean>(() => localStorage.getItem('user_gemini_enabled') === '1');
   const [mode, setMode] = useState<'manual' | 'smart'>(() => (localStorage.getItem('user_gemini_enabled') === '1' ? 'smart' : 'manual'));
 
-  
-  // Smart Input State
   const [smartInput, setSmartInput] = useState('');
   const [isParsing, setIsParsing] = useState(false);
-  const [isListening, setIsListening] = useState(false); // ??隤???
-  // Manual Form State
+  const [isListening, setIsListening] = useState(false);
+
   const [amount, setAmount] = useState<string>('');
   const [type, setType] = useState<TransactionType>(TransactionType.EXPENSE);
-  
   const [category, setCategory] = useState<string>('');
-
-  // 2. ??瘙箏??桀?閰脤＊蝷箏銝蝯?憿?  const currentCategories = type === TransactionType.EXPENSE 
-      ? (expenseCategories || []) 
-      : (incomeCategories || []);
-
-  // 3. ?嗅???舫???嚗??閮剖?憿閰脤???蝚砌????  useEffect(() => {
-      if (currentCategories.length > 0) {
-          if (!currentCategories.includes(category)) {
-              setCategory(currentCategories[0]);
-          }
-      }
-  }, [type, currentCategories, category]);
-  
   const [description, setDescription] = useState('');
   const [rewards, setRewards] = useState<string>('0');
+  const [targetUserUid, setTargetUserUid] = useState('');
   const [isRecurring, setIsRecurring] = useState(false);
-  const [executeDay, setExecuteDay] = useState<number>(() => {
-    const today = new Date();
-    return today.getDate();
-  });
+  const [executeDay, setExecuteDay] = useState<number>(() => new Date().getDate());
   const [intervalMonths, setIntervalMonths] = useState<number>(1);
   const [runMode, setRunMode] = useState<'continuous' | 'limited'>('continuous');
   const [totalRuns, setTotalRuns] = useState<string>('12');
-  
-  // Initialize date with selectedDate or today
+
+  const recognitionRef = useRef<any>(null);
+
+  const currentCategories = type === TransactionType.EXPENSE
+    ? (expenseCategories || [])
+    : (incomeCategories || []);
+
+  const availableUsers = useMemo(() => {
+    const list = users.length ? users : [];
+    if (currentUser && !list.find((u) => u.uid === currentUser.uid)) {
+      return [currentUser, ...list];
+    }
+    return list;
+  }, [users, currentUser]);
+
   const [date, setDate] = useState(() => {
     const target = selectedDate || new Date();
     const year = target.getFullYear();
@@ -80,6 +67,47 @@ const AddTransaction: React.FC<Props> = ({ onComplete, autoStartVoice = false })
     const day = String(target.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   });
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent).detail as { enabled?: boolean } | undefined;
+      const enabled = detail?.enabled ?? (localStorage.getItem('user_gemini_enabled') === '1');
+      setIsAIEnabled(enabled);
+      setMode(enabled ? 'smart' : 'manual');
+    };
+    window.addEventListener('user-gemini-enabled-change', handler as EventListener);
+    return () => window.removeEventListener('user-gemini-enabled-change', handler as EventListener);
+  }, []);
+
+  useEffect(() => {
+    setIsAIEnabled(localStorage.getItem('user_gemini_enabled') === '1');
+  }, []);
+
+  useEffect(() => {
+    if (currentCategories.length > 0 && !currentCategories.includes(category)) {
+      setCategory(currentCategories[0]);
+    }
+  }, [currentCategories, category]);
+
+  useEffect(() => {
+    if (!selectedDate) return;
+    const year = selectedDate.getFullYear();
+    const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+    const day = String(selectedDate.getDate()).padStart(2, '0');
+    setDate(`${year}-${month}-${day}`);
+  }, [selectedDate]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    if (!targetUserUid) {
+      setTargetUserUid(currentUser.uid);
+      return;
+    }
+    const exists = availableUsers.some((u) => u.uid === targetUserUid);
+    if (!exists) {
+      setTargetUserUid(currentUser.uid);
+    }
+  }, [currentUser, availableUsers, targetUserUid]);
 
   useEffect(() => {
     if (isRecurring) return;
@@ -116,113 +144,83 @@ const AddTransaction: React.FC<Props> = ({ onComplete, autoStartVoice = false })
     return next;
   };
 
-  // If autoStartVoice was requested, trigger voice input on mount when in smart mode
-  useEffect(() => {
-    // Listen for Settings toggles so the tab visibility updates immediately
-    const handler = (e: any) => {
-      const enabled = typeof e?.detail?.enabled === 'boolean' ? e.detail.enabled : (localStorage.getItem('user_gemini_enabled') === '1');
-      setIsAIEnabled(enabled);
-      if (!enabled && mode === 'smart') setMode('manual');
-    };
-
-    window.addEventListener('user-gemini-enabled-change', handler as EventListener);
-
-    // If autoStartVoice was requested, ensure AI is enabled and auto-start when in smart mode
-    if (autoStartVoice && mode === 'smart' && isAIEnabled) {
-      // Minor delay to ensure component rendered fully
-      setTimeout(() => {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SpeechRecognition) {
-          // If Web Speech API not available, navigate to settings or notify user
-          alert('?函??汗?其??舀隤頛詨? (隢蝙??Chrome ??Safari)');
-          return;
-        }
-        handleVoiceInput();
-      }, 200);
-    }
-
-    return () => window.removeEventListener('user-gemini-enabled-change', handler as EventListener);
-  }, [autoStartVoice, mode, isAIEnabled]);
-
-  // ??隤頛詨???摩
   const handleVoiceInput = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      alert("?函??汗?其??舀隤頛詨? (隢蝙??Chrome ??Safari)");
+      alert('此瀏覽器不支援語音輸入。');
       return;
     }
 
-    if (isListening) {
-      setIsListening(false);
+    if (isListening && recognitionRef.current) {
+      recognitionRef.current.stop();
       return;
     }
 
     const recognition = new SpeechRecognition();
-    recognition.lang = 'zh-TW'; 
-    recognition.continuous = false;
-    recognition.interimResults = true;
-
-    recognition.onstart = () => setIsListening(true);
-
+    recognition.lang = 'zh-TW';
+    recognition.interimResults = false;
     recognition.onresult = (event: any) => {
       const transcript = Array.from(event.results)
-        .map((result: any) => result[0])
-        .map((result) => result.transcript)
-        .join('');
-      
-      setSmartInput(transcript); 
+        .map((result: any) => result[0]?.transcript)
+        .join(' ');
+      setSmartInput((prev) => (prev ? `${prev} ${transcript}` : transcript));
     };
-
-    recognition.onend = () => setIsListening(false);
-    recognition.onerror = (event: any) => {
-      console.error("Speech error", event.error);
+    recognition.onerror = () => {
+      setIsListening(false);
+    };
+    recognition.onend = () => {
       setIsListening(false);
     };
 
+    recognitionRef.current = recognition;
+    setIsListening(true);
     recognition.start();
   };
 
+  useEffect(() => {
+    if (!autoStartVoice || mode !== 'smart') return;
+    handleVoiceInput();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStartVoice, mode]);
+
   const handleSmartSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!ledgerId || !currentUser) return;
     if (!smartInput.trim()) return;
 
     setIsParsing(true);
-
-    // 4. 撠蝯?憿?雿萄蝯?AI
-    const allCategories = [...(expenseCategories || []), ...(incomeCategories || [])];
-    const result = await parseSmartInput(smartInput, allCategories);
-    setIsParsing(false);
-
-    if (result) {
-      setAmount(result.amount.toString());
-      
-      const newType = result.type as TransactionType;
-      setType(newType);
-      
-      const targetList = newType === TransactionType.EXPENSE ? expenseCategories : incomeCategories;
-
-      if (targetList && targetList.includes(result.category)) {
-          setCategory(result.category);
-      } else {
-          setCategory(targetList?.[0] || '?嗡?');
-      }
-      
-      setDescription(result.description);
-      setRewards(result.rewards?.toString() || '0');
-
-      if (result.date) {
-        setDate(result.date);
+    try {
+      const parsed = await parseSmartInput(smartInput, currentCategories);
+      if (!parsed) {
+        alert('解析失敗，請確認輸入內容。');
+        return;
       }
 
-      setMode('manual');
-    } else {
-      alert('?⊥??圾頛詨?批捆嚗??岫?蝙?冽??芋撘撓?乓?);
+      await addTransaction({
+        amount: parsed.amount,
+        type: parsed.type,
+        category: parsed.category,
+        description: parsed.description,
+        rewards: parsed.rewards || 0,
+        date: parsed.date ? new Date(parsed.date).toISOString() : new Date(date).toISOString(),
+        creatorUid: currentUser.uid,
+        targetUserUid: targetUserUid || currentUser.uid,
+        ledgerId
+      });
+
+      setSmartInput('');
+      onComplete();
+    } catch (err) {
+      console.error('Smart input failed:', err);
+      alert('智慧輸入失敗，請稍後再試。');
+    } finally {
+      setIsParsing(false);
     }
   };
 
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!ledgerId) return;
+    if (!ledgerId || !currentUser) return;
     const amountValue = parseFloat(amount);
     if (Number.isNaN(amountValue)) return;
 
@@ -230,11 +228,12 @@ const AddTransaction: React.FC<Props> = ({ onComplete, autoStartVoice = false })
       await addTransaction({
         amount: amountValue,
         type,
-        category: category,
+        category,
         description,
         rewards: parseFloat(rewards) || 0,
         date: new Date(date).toISOString(),
-        creatorUid: currentUser.uid, 
+        creatorUid: currentUser.uid,
+        targetUserUid: targetUserUid || currentUser.uid,
         ledgerId
       });
 
@@ -260,17 +259,16 @@ const AddTransaction: React.FC<Props> = ({ onComplete, autoStartVoice = false })
       }
 
       onComplete();
-    } catch (e) {
-      console.error('Save transaction failed:', e);
-      alert('?脣?憭望?嚗?蝔??岫??);
+    } catch (err) {
+      console.error('Save transaction failed:', err);
+      alert('儲存失敗，請稍後再試。');
     }
   };
 
-  const inputClass = "w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 dark:text-slate-100 transition-colors";
+  const inputClass = 'w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 dark:text-slate-100 transition-colors';
 
   return (
     <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden transition-colors">
-      {/* Tabs */}
       <div className="flex border-b border-slate-100 dark:border-slate-800">
         {isAIEnabled && (
           <button
@@ -278,7 +276,7 @@ const AddTransaction: React.FC<Props> = ({ onComplete, autoStartVoice = false })
             className={`flex-1 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${mode === 'smart' ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-500' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}
           >
             <Wand2 className="w-4 h-4" />
-            ?箸頛詨
+            智慧輸入
           </button>
         )}
 
@@ -286,7 +284,7 @@ const AddTransaction: React.FC<Props> = ({ onComplete, autoStartVoice = false })
           onClick={() => setMode('manual')}
           className={`flex-1 py-3 text-sm font-medium transition-colors ${mode === 'manual' ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-500' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}
         >
-          ??頛詨
+          手動輸入
         </button>
       </div>
 
@@ -294,47 +292,39 @@ const AddTransaction: React.FC<Props> = ({ onComplete, autoStartVoice = false })
         {mode === 'smart' ? (
           <form onSubmit={handleSmartSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                ?冽?摮?餈唬漱??              </label>
-              
-              {/* ??頛詨獢?隤??摰孵 */}
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">輸入描述</label>
               <div className="relative">
                 <textarea
                   value={smartInput}
                   onChange={(e) => setSmartInput(e.target.value)}
-                  placeholder="靘?嚗憭拇?擗?蝢拙之?拚熊 500???? 20 暺?
+                  placeholder="例：昨天晚餐 義大利麵 500 折扣 20"
                   className="w-full p-3 pb-12 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 min-h-[120px] text-slate-900 dark:text-slate-100 placeholder:text-slate-400 resize-none transition-colors"
                 />
-                
-                {/* ? 隤?? */}
                 <button
                   type="button"
                   onClick={handleVoiceInput}
-                  className={`absolute bottom-3 right-3 p-2 rounded-full transition-all duration-200 shadow-sm ${
-                    isListening 
-                      ? 'bg-rose-500 text-white animate-pulse shadow-rose-200' 
-                      : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-600'
-                  }`}
-                  title="隤頛詨"
+                  className={`absolute bottom-3 right-3 p-2 rounded-full transition-all duration-200 shadow-sm ${isListening ? 'bg-rose-500 text-white animate-pulse shadow-rose-200' : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-600'}`}
+                  title="語音輸入"
                 >
                   {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
                 </button>
               </div>
-
               <p className="text-xs text-slate-400 mt-2">
-                AI 撠????憿?憿?餈啜?擖誑???              </p>
+                AI 會自動解析金額、分類、描述與日期。
+                </p>
               <p className="text-[11px] text-indigo-500 mt-1">
-                ?瑟??恍銝???敹恍????唾儘霅?蝡??頛詨??              </p>
+                長按畫面下方的「+」可快速開啟語音辨識，立即開始輸入。
+                </p>
             </div>
             <button
               type="submit"
               disabled={isParsing || !smartInput}
               className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 rounded-xl font-medium shadow-lg shadow-indigo-200 dark:shadow-none hover:shadow-xl hover:shadow-indigo-300 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {isParsing ? '??銝?..' : (
+              {isParsing ? '解析中...' : (
                 <>
                   <MagicWandIcon className="w-5 h-5" />
-                  閫???批捆
+                  解析並儲存
                 </>
               )}
             </button>
@@ -349,20 +339,20 @@ const AddTransaction: React.FC<Props> = ({ onComplete, autoStartVoice = false })
                 onClick={() => setType(TransactionType.EXPENSE)}
                 className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-all ${type === TransactionType.EXPENSE ? 'bg-white dark:bg-slate-700 text-rose-600 dark:text-rose-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
               >
-                ?臬
+                支出
               </button>
               <button
                 type="button"
                 onClick={() => setType(TransactionType.INCOME)}
                 className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-all ${type === TransactionType.INCOME ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
               >
-                ?嗅
+                收入
               </button>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
-                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase mb-1">??</label>
+                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase mb-1">金額</label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
                   <input
@@ -378,13 +368,13 @@ const AddTransaction: React.FC<Props> = ({ onComplete, autoStartVoice = false })
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase mb-1">??</label>
+                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase mb-1">分類</label>
                 <select
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
-                  className={`${inputClass} p-2.5 text-sm`}
+                  className={`${inputClass} h-10 px-3 py-0 text-sm leading-4`}
                 >
-                  {/* 5. 雿輻 currentCategories 皜脫??賊? */}
+                  {/* 5. 使用 currentCategories 渲染選項 */}
                   {currentCategories.map((c) => (
                     <option key={c} value={c}>{c}</option>
                   ))}
@@ -392,50 +382,64 @@ const AddTransaction: React.FC<Props> = ({ onComplete, autoStartVoice = false })
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase mb-1">?交?</label>
+                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase mb-1">日期</label>
                 <input
                   type="date"
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
-                  className={`${inputClass} p-2.5 text-sm text-slate-600 dark:text-slate-300`}
+                  className={`${inputClass} h-10 px-3 py-0 text-sm text-slate-600 dark:text-slate-300 leading-4`}
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase mb-1">?膩</label>
+              <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase mb-1">描述</label>
               <input
                 type="text"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 required
                 className={`${inputClass} p-2.5 text-sm`}
-                placeholder="??瘨祥?舐鈭?暻潘?"
+                placeholder="這筆消費是為了什麼？"
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase mb-1 flex items-center justify-between">
-                <span>?? / 暺</span>
-                <span className="text-[10px] bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded-full">?詨‵</span>
-              </label>
-              <div className="relative">
-                <input
-                  type="number"
-                  step="0.1"
-                  value={rewards}
-                  onChange={(e) => setRewards(e.target.value)}
-                  className={`${inputClass} pl-3 pr-4 py-2.5 text-sm focus:ring-amber-400`}
-                  placeholder="0"
-                />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase mb-1 flex items-center justify-between leading-4 min-h-[16px]">
+                  <span>回饋 / 點數</span>
+                  <span className="text-[10px] bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 px-1.5 py-0 rounded-full">選填</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={rewards}
+                    onChange={(e) => setRewards(e.target.value)}
+                  className={`${inputClass} h-10 px-3 py-0 text-sm text-slate-600 dark:text-slate-300 leading-4`}
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase mb-1">被記帳人</label>
+                <select
+                  value={targetUserUid}
+                  onChange={(e) => setTargetUserUid(e.target.value)}
+                  className={`${inputClass} h-10 px-3 py-0 text-sm leading-4`}
+                >
+                  {availableUsers.map((u) => (
+                    <option key={u.uid} value={u.uid}>{u.displayName || '訪客'}</option>
+                  ))}
+                </select>
               </div>
             </div>
 
             <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-3 bg-slate-50 dark:bg-slate-800">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">閮剔?望???/div>
-                  <div className="text-[11px] text-slate-400">瘥??芸?閮董嚗????箏?鞎餌嚗?/div>
+                  <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">設為週期性</div>
+                  <div className="text-[11px] text-slate-400">每月自動記帳（分期或固定費用）</div>
                 </div>
                 <label className="inline-flex relative items-center cursor-pointer">
                   <input type="checkbox" checked={isRecurring} onChange={(e) => setIsRecurring(e.target.checked)} className="sr-only" />
@@ -449,19 +453,19 @@ const AddTransaction: React.FC<Props> = ({ onComplete, autoStartVoice = false })
                 <div className="mt-3 space-y-3">
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase mb-1">瘥???狡??/label>
+                      <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase mb-1">每月扣款日</label>
                       <select
                         value={executeDay}
                         onChange={(e) => setExecuteDay(Number(e.target.value))}
-                        className={`${inputClass} p-2.5 text-sm`}
+                        className={`${inputClass} h-10 px-3 py-0 text-sm leading-4`}
                       >
                         {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
-                          <option key={d} value={d}>{d} ??/option>
+                          <option key={d} value={d}>{d} 號</option>
                         ))}
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase mb-1">瘥?N ??</label>
+                      <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase mb-1">每 N 個月</label>
                       <input
                         type="number"
                         min={1}
@@ -473,21 +477,21 @@ const AddTransaction: React.FC<Props> = ({ onComplete, autoStartVoice = false })
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase mb-1">?瑁?甈⊥</label>
+                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase mb-1">執行次數</label>
                     <div className="flex gap-2">
                       <button
                         type="button"
                         onClick={() => setRunMode('continuous')}
                         className={`flex-1 px-3 py-2 rounded-lg text-sm border ${runMode === 'continuous' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'}`}
                       >
-                        ??
+                        持續
                       </button>
                       <button
                         type="button"
                         onClick={() => setRunMode('limited')}
                         className={`flex-1 px-3 py-2 rounded-lg text-sm border ${runMode === 'limited' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'}`}
                       >
-                        ??甈⊥
+                        指定次數
                       </button>
                     </div>
                     {runMode === 'limited' && (
@@ -497,7 +501,7 @@ const AddTransaction: React.FC<Props> = ({ onComplete, autoStartVoice = false })
                         value={totalRuns}
                         onChange={(e) => setTotalRuns(e.target.value)}
                         className={`${inputClass} p-2.5 text-sm mt-2`}
-                        placeholder="靘?嚗?2"
+                        placeholder="例如：12"
                       />
                     )}
                   </div>
@@ -510,7 +514,7 @@ const AddTransaction: React.FC<Props> = ({ onComplete, autoStartVoice = false })
               className="w-full mt-2 bg-indigo-600 text-white py-3 rounded-xl font-medium shadow-md hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
             >
               <CheckIcon className="w-5 h-5" />
-              ?脣?鈭斗?
+              儲存交易
             </button>
           </form>
         )}

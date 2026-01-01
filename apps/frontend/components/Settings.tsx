@@ -694,10 +694,7 @@ const Settings = () => {
 
       <SectionCard title="帳本與分類" description="切換帳本、管理分類並查看成員。">
         <div className="space-y-4">
-          <button
-            onClick={() => setShowLedgerSwitcher(true)}
-            className="w-full bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-100 dark:border-slate-800 text-left hover:border-indigo-200 dark:hover:border-indigo-800 transition-colors"
-          >
+          <div className="w-full bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-100 dark:border-slate-800 text-left">
             <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">目前帳本</div>
             <div className="flex items-center justify-between mt-2 gap-3">
               <div>
@@ -741,10 +738,9 @@ const Settings = () => {
                 >
                   <LogOutIcon className="w-4 h-4" />
                 </button>
-                <ChevronRightIcon className="w-5 h-5 text-slate-400" />
               </div>
             </div>
-          </button>
+          </div>
 
           <button
             onClick={() => setShowLedgerList((v) => !v)}
@@ -990,7 +986,7 @@ const Settings = () => {
       </button>
 
       <div className="text-center text-xs text-slate-400 py-4">
-        CloudLedger 雲記 v3.5.0 © 2025 KrendStudio
+        CloudLedger 雲記 v3.5.1 © 2025 KrendStudio
       </div>
 
       {showLedgerSwitcher && (

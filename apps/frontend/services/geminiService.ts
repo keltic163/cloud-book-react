@@ -1,9 +1,10 @@
-﻿import { getFunctions, httpsCallable } from "firebase/functions";
-import { app } from "../firebase"; // 蝣箔?撘????? app
+import { getFunctions, httpsCallable } from "firebase/functions";
+import { app } from "../firebase"; // 確保引入的是初始化的 app
 import { TransactionType } from "../types"; 
-// ??靽格嚗??交?蝯虜??import { DEFAULT_EXPENSE_CATEGORIES, DEFAULT_INCOME_CATEGORIES } from "../constants";
+// ✅ 修改：引入新的兩組常數
+import { DEFAULT_EXPENSE_CATEGORIES, DEFAULT_INCOME_CATEGORIES } from "../constants";
 
-// ????Cloud Functions
+// 初始化 Cloud Functions
 const functions = getFunctions(app);
 
 export interface ParsedTransactionData {
@@ -15,32 +16,33 @@ export interface ParsedTransactionData {
   date?: string;
 }
 
-// ??靽格嚗?雿萄蝯?憿??粹?閮剖?獢?const defaultAllCategories = [...DEFAULT_EXPENSE_CATEGORIES, ...DEFAULT_INCOME_CATEGORIES];
+// ✅ 修改：合併兩組分類作為預設備案
+const defaultAllCategories = [...DEFAULT_EXPENSE_CATEGORIES, ...DEFAULT_INCOME_CATEGORIES];
 
 /**
- * ?澆 Firebase Cloud Function (敺垢) ?脰? AI 閫??
+ * 呼叫 Firebase Cloud Function (後端) 進行 AI 解析
  */
 export const parseSmartInput = async (
   input: string, 
-  // ??靽格嚗?閮剖潭?典?雿萄?????
+  // ✅ 修改：預設值改用合併後的新陣列
   availableCategories: string[] = defaultAllCategories 
 ): Promise<ParsedTransactionData | null> => {
   try {
-    // 撱箇?敺垢?賢??
+    // 建立後端函式參照
     const parseTransactionFn = httpsCallable(functions, 'parseTransaction');
     
     // Read user-provided key (if any) from localStorage. This allows a user to input a
     // dev-code here and have the backend substitute the server key when appropriate.
     const userKey = localStorage.getItem('user_gemini_key') || undefined;
 
-    // ?潮?瘙?(??apiKey 銝雿菟靘?Functions 瘙箏????孵?)
+    // 發送請求 (把 apiKey 一併送出供 Functions 決定處理方式)
     const result = await parseTransactionFn({
       text: input,
       categories: availableCategories,
       apiKey: userKey
     });
 
-    // Cloud Functions ???? data 撅祆找葉
+    // Cloud Functions 回傳的資料在 data 屬性中
     return result.data as ParsedTransactionData;
 
   } catch (error) {
@@ -50,7 +52,7 @@ export const parseSmartInput = async (
 };
 
 /**
- * 撽? / 皜祈岫雿輻??靘? API Key嚗蒂??舐璅∪?皜
+ * 驗證 / 測試使用者提供的 API Key，並回傳可用模型清單
  */
 export const validateApiKey = async (apiKey?: string): Promise<{ valid: boolean; models: string[] } > => {
   try {

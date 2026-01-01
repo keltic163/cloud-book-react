@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>CloudLedger ?脰?</title>
-    
+    <title>CloudLedger 雲記</title>
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -13,8 +13,8 @@
           extend: {
             colors: {
               slate: {
-                850: '#1e293b', 
-                950: '#020617', 
+                850: '#1e293b',
+                950: '#020617',
               }
             }
           }
@@ -32,33 +32,32 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-title" content="CloudLedger" />
 
-
     <meta name="theme-color" content="#ffffff">
     <style>
-      body { 
-        font-family: 'Inter', sans-serif; 
-        background-color: #f8fafc; 
+      body {
+        font-family: 'Inter', sans-serif;
+        background-color: #f8fafc;
         overscroll-behavior-y: none;
       }
       html.dark body {
-        background-color: #020617; 
+        background-color: #020617;
       }
       .no-scrollbar::-webkit-scrollbar { display: none; }
       .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
 
-      /* 頝收????*/
+      /* 跑馬燈 */
       .animate-marquee {
         animation: marquee 10s linear infinite;
-        white-space: nowrap; /* 蝣箔???銝?銵?*/
+        white-space: nowrap; /* 文字不換行 */
       }
 
       @keyframes marquee {
-        /* 韏琿?嚗雁???喲? (? React 鋆⊥?撖?left-full嚗ㄐ閮?0 ?喳) */
+        /* 起始：文字在畫面右側（配合 React 的 left-full，可用 0 也可） */
         0% { transform: translateX(0); }
-        
-        /* ?? 靽格 2: 蝯??寞????撟祝摨艾?蝣箔?頝?撌阡???閬甇?*/
-        100% { transform: translateX(calc(-100vw - 100%)); } 
+
+        /* 結束：文字走出左側（移動距離為視窗寬度 + 文字寬度） */
+        100% { transform: translateX(calc(-100vw - 100%)); }
       }
     </style>
   </head>

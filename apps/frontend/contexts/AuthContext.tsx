@@ -1,4 +1,4 @@
-﻿import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { 
   signInWithPopup,
   signInWithRedirect,
@@ -31,7 +31,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Checks mock mode status on mount or when changed externally
   useEffect(() => {
-    // ?芸?瑼Ｘ璅⊥璅∪?
+    // 優先檢查模擬模式
     if (isMockMode) {
       const mockUser = localStorage.getItem('cloudledger_mock_user');
       if (mockUser) {
@@ -41,7 +41,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         // or wait for explicit action. Let's auto-login to be safe if they are stuck.
          const defaultMockUser: any = {
             uid: 'mock-user-123',
-            displayName: '瞍內雿輻??,
+            displayName: '演示使用者',
             email: 'demo@example.com',
             photoURL: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix',
             emailVerified: true
@@ -75,7 +75,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setTimeout(() => {
       const mockUser: any = {
         uid: 'mock-user-123',
-        displayName: '瞍內雿輻??,
+        displayName: '演示使用者',
         email: 'demo@example.com',
         photoURL: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix',
         emailVerified: true
@@ -87,13 +87,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const signInWithGoogle = async () => {
-    // 憒?撌脩??舀芋?祆芋撘??湔璅⊥?餃
+    // 如果已經是模擬模式，直接模擬登入
     if (isMockMode) {
       loginAsMockUser();
       return;
     }
 
-    // 憒? Firebase ???仃????銝行芋?祉??    if (!auth || !googleProvider) {
+    // 如果 Firebase 初始化失敗，切換並模擬登入
+    if (!auth || !googleProvider) {
       loginAsMockUser();
       return;
     }
@@ -122,9 +123,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           return;
       }
 
-      // 閰Ｗ?雿輻??血??璅⊥璅∪?
+      // 詢問使用者是否切換至模擬模式
       const confirmMock = window.confirm(
-        `?餃?潛??航炊 (${errorCode})?n${errorMessage}\n\n?臬???喋?蝷箸芋撘?Mock Mode)嚗n甇斗芋撘?鞈??摮?祆?嚗????唾?脩垢?
+        `登入發生錯誤 (${errorCode})。\n${errorMessage}\n\n是否切換至「演示模式」(Mock Mode)？\n此模式下資料僅儲存於本機，不會上傳至雲端。`
       );
 
       if (confirmMock) {
@@ -146,8 +147,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (errorCode === 'auth/unauthorized-domain') {
         const currentDomain = window.location.hostname;
         alert(
-          `?? 蝬脣??芣?甈n\n` +
-          `隢 Firebase Console 撠?"${currentDomain}" ???蝬脣??賢??柴
+          `⚠️ 網域未授權\n\n` +
+          `請至 Firebase Console 將 "${currentDomain}" 加入授權網域白名單。`
         );
       }
     }

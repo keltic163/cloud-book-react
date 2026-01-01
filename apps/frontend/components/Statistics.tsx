@@ -15,46 +15,49 @@ import {
 type TimeRange = 'month' | 'year';
 
 const Statistics = () => {
-  // 1. 敺?Context ?鞈?
+  // 1. 從 Context 取出資料
   const context = useAppContext();
   const transactions = context.transactions || [];
   const users = context.users || [];
   const expenseCategories = context.expenseCategories || [];
   const incomeCategories = context.incomeCategories || [];
 
-  // --- ??恣??---
+  // --- 狀態管理 ---
   const [currentDate, setCurrentDate] = useState(new Date());
   const [timeRange, setTimeRange] = useState<TimeRange>('month');
   const [viewType, setViewType] = useState<TransactionType>(TransactionType.EXPENSE);
   
-  // 蝭拚???UI
+  // 篩選狀態 UI
   const [showFilter, setShowFilter] = useState(false);
   
-  // ?詨?蝭拚璇辣
+  // 核心篩選條件
   const [selectedMemberId, setSelectedMemberId] = useState<string | 'all'>('all');
   const [filterCategory, setFilterCategory] = useState<string | 'all'>('all');
   const [keyword, setKeyword] = useState('');
 
-  // --- ?詨?閮??摩 ---
+  // --- 核心計算邏輯 ---
   const stats = useMemo(() => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth(); 
 
-    // 1. 蝚砌?撅斤祟?賂??典??蕪 (????萄???憿?
-    // ??蝭拚???蔣?踴僑摨西隅?Ｕ??底蝝啣?銵具?    let filteredTransactions = transactions.filter(t => {
-        // A. ?蝭拚
-        if (selectedMemberId !== 'all' && t.creatorUid !== selectedMemberId) return false;
+    // 1. 第一層篩選：全域過濾 (成員、關鍵字、分類)
+    // 這些篩選會同時影響「年度趨勢」和「詳細圖表」
+    let filteredTransactions = transactions.filter(t => {
+        const targetId = t.targetUserUid || t.creatorUid;
+        // A. 成員篩選（被記帳人）
+        if (selectedMemberId !== 'all' && targetId !== selectedMemberId) return false;
         
-        // B. ?摮祟??(???酉)
+        // B. 關鍵字篩選 (搜尋備註)
         if (keyword.trim() !== '' && !t.description.includes(keyword.trim())) return false;
 
-        // C. ??蝭拚
-        // 瘜冽?嚗?????臬嚗??訾??嗅??嚗?頛臭??? 0嚗甇?虜??        if (filterCategory !== 'all' && t.category !== filterCategory) return false;
+        // C. 分類篩選
+        // 注意：如果目前看支出，但選了收入分類，邏輯上會變 0，這是正常的
+        if (filterCategory !== 'all' && t.category !== filterCategory) return false;
 
         return true;
     });
 
-    // 2. 皞??僑摨艾??(?冽?瑟???
+    // 2. 準備「年度」數據 (用於長條圖)
     const yearlyData = Array(12).fill(0).map(() => ({ income: 0, expense: 0 }));
     let yearTotalIncome = 0;
     let yearTotalExpense = 0;
@@ -72,14 +75,16 @@ const Statistics = () => {
           yearlyData[m].income += t.amount;
           yearTotalIncome += t.amount;
         }
-        // ?????交??        if (t.rewards && t.rewards > 0) {
+        // 回饋金計入收入
+        if (t.rewards && t.rewards > 0) {
           yearlyData[m].income += t.rewards;
           yearTotalIncome += t.rewards;
         }
       }
     });
 
-    // 3. 皞?????砍僑?＊蝷箇?底蝝唳??    const activeTransactions = filteredTransactions.filter(t => {
+    // 3. 準備「本月/本年」顯示用的詳細數據
+    const activeTransactions = filteredTransactions.filter(t => {
       const tDate = new Date(t.date);
       if (timeRange === 'month') {
         return tDate.getFullYear() === year && tDate.getMonth() === month;
@@ -88,7 +93,8 @@ const Statistics = () => {
       }
     });
 
-    // 閮?憿舐內?函?蝮賡?憿?    const displayTotalIncome = timeRange === 'month' 
+    // 計算顯示用的總金額
+    const displayTotalIncome = timeRange === 'month' 
       ? activeTransactions.reduce((acc, t) => {
           let val = t.type === TransactionType.INCOME ? t.amount : 0;
           val += (t.rewards || 0); 
@@ -102,12 +108,12 @@ const Statistics = () => {
 
     const displayBalance = displayTotalIncome - displayTotalExpense;
 
-    // 4. ???”?函??豢?
+    // 4. 分析圖表用的數據
     let chartTotalAmount = 0;
     let breakdownCategories: { name: string, amount: number }[] = [];
     
     if (viewType === TransactionType.EXPENSE) {
-        // ?臬??
+        // 支出分析
         const expTxs = activeTransactions.filter(t => t.type === TransactionType.EXPENSE);
         chartTotalAmount = expTxs.reduce((acc, t) => acc + t.amount, 0);
         
@@ -119,7 +125,7 @@ const Statistics = () => {
             return { name: cat, amount };
         });
     } else {
-        // ?嗅??
+        // 收入分析
         const safeCategories = Array.isArray(incomeCategories) ? incomeCategories : [];
         breakdownCategories = safeCategories.map(cat => {
             const amount = activeTransactions
@@ -128,10 +134,10 @@ const Statistics = () => {
             return { name: cat, amount };
         });
 
-        // 暺????
+        // 點券折抵虛擬分類
         const totalRewards = activeTransactions.reduce((acc, t) => acc + (t.rewards || 0), 0);
         if (totalRewards > 0) {
-            breakdownCategories.push({ name: '暺?', amount: totalRewards });
+            breakdownCategories.push({ name: '點券折抵', amount: totalRewards });
         }
 
         chartTotalAmount = breakdownCategories.reduce((acc, c) => acc + c.amount, 0);
@@ -139,16 +145,16 @@ const Statistics = () => {
 
     breakdownCategories = breakdownCategories.filter(c => c.amount > 0).sort((a, b) => b.amount - a.amount);
 
-    // ?蝯梯?
+    // 成員統計
     const memberStats = users.map(user => {
         let val = 0;
         if (viewType === TransactionType.EXPENSE) {
             val = activeTransactions
-                .filter(t => t.creatorUid === user.uid && t.type === TransactionType.EXPENSE)
+                .filter(t => (t.targetUserUid || t.creatorUid) === user.uid && t.type === TransactionType.EXPENSE)
                 .reduce((acc, t) => acc + t.amount, 0);
         } else {
             val = activeTransactions
-                .filter(t => t.creatorUid === user.uid)
+                .filter(t => (t.targetUserUid || t.creatorUid) === user.uid)
                 .reduce((acc, t) => {
                     let income = t.type === TransactionType.INCOME ? t.amount : 0;
                     income += (t.rewards || 0);
@@ -181,21 +187,21 @@ const Statistics = () => {
   };
 
   const getCategoryColor = (cat: string) => {
-    if (cat === '暺?') return 'bg-amber-400';
+    if (cat === '點券折抵') return 'bg-amber-400';
     switch (cat) {
-      case '擗ㄡ': return 'bg-orange-500';
-      case '鈭日?: return 'bg-blue-500';
-      case '鞈潛': return 'bg-pink-500';
-      case '撅?': return 'bg-purple-500';
-      case '憡?': return 'bg-yellow-500';
-      case '?芾?': return 'bg-emerald-500';
-      case '??': return 'bg-yellow-400';
-      case '??': return 'bg-cyan-500';
+      case '餐飲': return 'bg-orange-500';
+      case '交通': return 'bg-blue-500';
+      case '購物': return 'bg-pink-500';
+      case '居住': return 'bg-purple-500';
+      case '娛樂': return 'bg-yellow-500';
+      case '薪資': return 'bg-emerald-500';
+      case '獎金': return 'bg-yellow-400';
+      case '投資': return 'bg-cyan-500';
       default: return 'bg-slate-400'; 
     }
   };
 
-  // ?蔭蝭拚
+  // 重置篩選
   const resetFilters = () => {
       setKeyword('');
       setSelectedMemberId('all');
@@ -204,7 +210,7 @@ const Statistics = () => {
 
   const hasActiveFilters = keyword || selectedMemberId !== 'all' || filterCategory !== 'all';
 
-  // ???桀??舐靘祟?貊???皜 (?寞??嗅???璅∪?)
+  // 取得目前可用來篩選的分類清單 (根據當前分析模式)
   const availableFilterCategories = viewType === TransactionType.EXPENSE ? expenseCategories : incomeCategories;
 
   return (
@@ -221,10 +227,10 @@ const Statistics = () => {
             
             <div className="text-center">
               <div className="text-xs text-slate-400 font-medium mb-0.5">
-                  {timeRange === 'month' ? `${currentDate.getFullYear()} 撟循 : '撟游漲?梯”'}
+                  {timeRange === 'month' ? `${currentDate.getFullYear()} 年` : '年度報表'}
               </div>
               <div className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2 justify-center">
-                {timeRange === 'month' ? `${currentDate.getMonth() + 1} ? : `${currentDate.getFullYear()} 撟循}
+                {timeRange === 'month' ? `${currentDate.getMonth() + 1} 月` : `${currentDate.getFullYear()} 年`}
               </div>
             </div>
 
@@ -246,46 +252,46 @@ const Statistics = () => {
         {showFilter && (
             <div className="pt-4 border-t border-slate-100 dark:border-slate-800 animate-in slide-in-from-top-2 space-y-4">
                 
-                {/* 1. 瑼Ｚ?璅∪? & ?蔭 */}
+                {/* 1. 檢視模式 & 重置 */}
                 <div className="flex items-center justify-between">
                     <div className="flex bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg">
                         <button 
                             onClick={() => setTimeRange('month')} 
                             className={`px-3 py-1 text-xs rounded-md transition-all ${timeRange === 'month' ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-300' : 'text-slate-500'}`}
-                        >?銵?/button>
+                        >月報表</button>
                         <button 
                             onClick={() => setTimeRange('year')} 
                             className={`px-3 py-1 text-xs rounded-md transition-all ${timeRange === 'year' ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-300' : 'text-slate-500'}`}
-                        >撟渲隅??/button>
+                        >年趨勢</button>
                     </div>
                     {hasActiveFilters && (
                         <button onClick={resetFilters} className="text-xs text-rose-500 flex items-center gap-1 hover:underline">
-                            <RotateCcw className="w-3 h-3" /> ?蔭璇辣
+                            <RotateCcw className="w-3 h-3" /> 重置條件
                         </button>
                     )}
                 </div>
 
-                {/* 2. ?摮?撠?*/}
+                {/* 2. 關鍵字搜尋 */}
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input 
                         type="text" 
                         value={keyword}
                         onChange={(e) => setKeyword(e.target.value)}
-                        placeholder="???酉?摮?.." 
+                        placeholder="搜尋備註關鍵字..." 
                         className="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white"
                     />
                 </div>
                 
-                {/* 3. ?蝭拚 (璈怠??脣?) */}
+                {/* 3. 成員篩選 (橫向捲動) */}
                 <div className="space-y-2">
-                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">?</span>
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">成員</span>
                     <div className="flex gap-2 overflow-x-auto pb-1 hide-scrollbar">
                         <button
                             onClick={() => setSelectedMemberId('all')}
                             className={`px-3 py-1.5 rounded-full text-xs font-medium border whitespace-nowrap transition-all ${selectedMemberId === 'all' ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'}`}
                         >
-                            ?券
+                            全部
                         </button>
                         {users.map(u => (
                             <button
@@ -300,20 +306,20 @@ const Statistics = () => {
                     </div>
                 </div>
 
-                {/* 4. ??蝭拚 (璈怠??脣?) */}
+                {/* 4. 分類篩選 (橫向捲動) */}
                 <div className="space-y-2">
                     <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                            {viewType === TransactionType.EXPENSE ? '?臬??' : '?嗅??'}
+                            {viewType === TransactionType.EXPENSE ? '支出分類' : '收入分類'}
                         </span>
-                        <span className="text-[10px] text-slate-400">(靘??孵??芋撘??)</span>
+                        <span className="text-[10px] text-slate-400">(依下方分析模式連動)</span>
                     </div>
                     <div className="flex gap-2 overflow-x-auto pb-1 hide-scrollbar">
                         <button
                             onClick={() => setFilterCategory('all')}
                             className={`px-3 py-1.5 rounded-full text-xs font-medium border whitespace-nowrap transition-all ${filterCategory === 'all' ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'}`}
                         >
-                            ?券
+                            全部
                         </button>
                         {availableFilterCategories.map(cat => (
                             <button
@@ -330,28 +336,28 @@ const Statistics = () => {
         )}
       </div>
 
-      {/* 2. 蝮質汗?∠? */}
+      {/* 2. 總覽卡片 */}
       <div className="grid grid-cols-3 gap-2 text-center">
         <div className="bg-emerald-50 dark:bg-emerald-900/20 p-3 rounded-xl border border-emerald-100 dark:border-emerald-800/30">
-          <div className="text-xs text-emerald-600 dark:text-emerald-400 mb-1">蝮賣??(?怠?擖?</div>
+          <div className="text-xs text-emerald-600 dark:text-emerald-400 mb-1">總收入 (含回饋)</div>
           <div className="font-bold text-emerald-700 dark:text-emerald-300 text-sm md:text-base">${stats.displayTotalIncome.toLocaleString()}</div>
         </div>
         <div className="bg-rose-50 dark:bg-rose-900/20 p-3 rounded-xl border border-rose-100 dark:border-rose-800/30">
-          <div className="text-xs text-rose-600 dark:text-rose-400 mb-1">蝮賣??/div>
+          <div className="text-xs text-rose-600 dark:text-rose-400 mb-1">總支出</div>
           <div className="font-bold text-rose-700 dark:text-rose-300 text-sm md:text-base">${stats.displayTotalExpense.toLocaleString()}</div>
         </div>
         <div className={`p-3 rounded-xl border ${stats.displayBalance >= 0 ? 'bg-blue-50 border-blue-100 dark:bg-blue-900/20 dark:border-blue-800/30' : 'bg-slate-50 border-slate-200 dark:bg-slate-800 dark:border-slate-700'}`}>
-          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{timeRange === 'month' ? '?祆?' : '撟游漲'}蝯?</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">{timeRange === 'month' ? '本月' : '年度'}結餘</div>
           <div className={`font-bold text-sm md:text-base ${stats.displayBalance >= 0 ? 'text-blue-700 dark:text-blue-300' : 'text-slate-600 dark:text-slate-400'}`}>${stats.displayBalance.toLocaleString()}</div>
         </div>
       </div>
 
-      {/* 3. 撟游漲頞典??(?撟湔芋撘＊蝷? */}
+      {/* 3. 年度趨勢圖 (僅在年模式顯示) */}
       {timeRange === 'year' && (
           <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-100 dark:border-slate-800">
               <h3 className="font-semibold text-slate-800 dark:text-slate-100 mb-4 flex items-center gap-2">
                   <BarChart3 className="w-4 h-4" />
-                  撟游漲?嗆頞典
+                  年度收支趨勢
               </h3>
               <div className="h-40 flex items-end gap-1.5 sm:gap-3">
                   {stats.yearlyData.map((data, index) => {
@@ -367,9 +373,9 @@ const Statistics = () => {
                           <div key={index} className="flex-1 flex flex-col justify-end items-center group relative">
                               {/* Tooltip */}
                               <div className="opacity-0 group-hover:opacity-100 absolute bottom-full mb-2 bg-slate-800 text-white text-[10px] p-2 rounded pointer-events-none z-10 w-24 text-center">
-                                  {index + 1}??br/>
-                                  ?? {data.income.toLocaleString()}<br/>
-                                  ?? {data.expense.toLocaleString()}
+                                  {index + 1}月<br/>
+                                  收: {data.income.toLocaleString()}<br/>
+                                  支: {data.expense.toLocaleString()}
                               </div>
                               
                               <div className="w-full flex gap-0.5 sm:gap-1 items-end h-full">
@@ -390,26 +396,27 @@ const Statistics = () => {
           </div>
       )}
 
-      {/* 4. ???” (Pie & Member) */}
+      {/* 4. 分析圖表 (Pie & Member) */}
       <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
         <button 
-            onClick={() => { setViewType(TransactionType.EXPENSE); setFilterCategory('all'); }} // ????蝵桀?憿祟?賂??踹??摩?
+            onClick={() => { setViewType(TransactionType.EXPENSE); setFilterCategory('all'); }} // 切換時重置分類篩選，避免邏輯打架
             className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${viewType === TransactionType.EXPENSE ? 'bg-white dark:bg-slate-700 text-rose-600 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
         >
-          ?臬??
+          支出分析
         </button>
         <button 
             onClick={() => { setViewType(TransactionType.INCOME); setFilterCategory('all'); }} 
             className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${viewType === TransactionType.INCOME ? 'bg-white dark:bg-slate-700 text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
         >
-          ?嗅??擖?        </button>
+          收入與回饋
+        </button>
       </div>
 
-      {/* 憿?? */}
+      {/* 類別排行 */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-100 dark:border-slate-800">
         <h3 className="font-semibold text-slate-800 dark:text-slate-100 mb-4 flex items-center gap-2">
           <PieChart className="w-4 h-4" />
-          {viewType === TransactionType.EXPENSE ? '?臬憿雿?' : '?嗅靘?雿?'}
+          {viewType === TransactionType.EXPENSE ? '支出類別佔比' : '收入來源佔比'}
         </h3>
         {stats.categoryStats.length > 0 ? (
           <div className="space-y-4">
@@ -420,7 +427,7 @@ const Statistics = () => {
                   <div className="flex justify-between text-sm mb-1">
                     <span className="font-medium text-slate-700 dark:text-slate-300 flex items-center gap-2">
                         {cat.name}
-                        {cat.name === '暺?' && <span className="text-[9px] bg-amber-100 text-amber-700 px-1 rounded">HOT</span>}
+                        {cat.name === '點券折抵' && <span className="text-[9px] bg-amber-100 text-amber-700 px-1 rounded">HOT</span>}
                     </span>
                     <span className="text-slate-500 dark:text-slate-400">{percentage}% (${cat.amount.toLocaleString()})</span>
                   </div>
@@ -436,16 +443,16 @@ const Statistics = () => {
           </div>
         ) : (
           <div className="text-center text-slate-400 dark:text-slate-500 py-8 text-sm">
-              {hasActiveFilters ? '蝭拚璇辣銝鞈?' : '甇斗??鞈?'}
+              {hasActiveFilters ? '篩選條件下無資料' : '此期間無資料'}
           </div>
         )}
       </div>
 
-      {/* ??? */}
+      {/* 成員排行 */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-100 dark:border-slate-800">
         <h3 className="font-semibold text-slate-800 dark:text-slate-100 mb-4 flex items-center gap-2">
           <TrendingUp className="w-4 h-4" />
-          {viewType === 'EXPENSE' ? '??臬??' : '?鞎Ｙ??'}
+          {viewType === 'EXPENSE' ? '成員支出排行' : '成員貢獻排行'}
         </h3>
         <div className="space-y-4">
           {stats.memberStats.map((user, idx) => (
@@ -456,7 +463,7 @@ const Statistics = () => {
                        <img src={user.photoURL || ''} alt={user.displayName || ''} className="w-10 h-10 rounded-full bg-slate-50 dark:bg-slate-700 object-cover" />
                        <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white dark:border-slate-900 ${user.color || 'bg-gray-400'}`}></div>
                    </div>
-                   <div className="font-medium text-slate-700 dark:text-slate-200">{user.displayName || '?芰?'}</div>
+                   <div className="font-medium text-slate-700 dark:text-slate-200">{user.displayName || '未知成員'}</div>
                 </div>
                 <div className="text-right">
                    <div className="font-bold text-slate-800 dark:text-white">${user.val.toLocaleString()}</div>
@@ -466,7 +473,7 @@ const Statistics = () => {
                 </div>
              </div>
           ))}
-          {stats.memberStats.every(u => u.val === 0) && <p className="text-center text-slate-400 py-2">甇斗??鞈?</p>}
+          {stats.memberStats.every(u => u.val === 0) && <p className="text-center text-slate-400 py-2">此期間無資料</p>}
         </div>
       </div>
 

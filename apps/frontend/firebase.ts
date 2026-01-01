@@ -1,4 +1,4 @@
-﻿import * as firebaseApp from "firebase/app";
+import * as firebaseApp from "firebase/app";
 import { getAuth, GoogleAuthProvider, type Auth } from "firebase/auth";
 import { getFirestore, type Firestore } from "firebase/firestore";
 import { getFunctions, type Functions } from "firebase/functions";
@@ -13,7 +13,7 @@ const firebaseConfig = {
     measurementId: "G-TH05DSNHES"
   };
 
-// 摰儔霈
+// 定義變數
 let app;
 let auth: Auth | undefined;
 let db: Firestore | undefined;
@@ -22,7 +22,7 @@ let googleProvider: GoogleAuthProvider | undefined;
 let isMockMode = false;
 
 try {
-  // 1. ?岫????Firebase (Modular Syntax - Named Import)
+  // 1. 嘗試初始化 Firebase (Modular Syntax - Named Import)
   // Use namespace import to avoid TypeScript error 'Module has no exported member initializeApp'
   app = firebaseApp.initializeApp(firebaseConfig);
   auth = getAuth(app);
@@ -30,19 +30,20 @@ try {
   functions = getFunctions(app);
   googleProvider = new GoogleAuthProvider();
   
-  console.log("??Firebase ????岫??");
+  console.log("✅ Firebase 連線嘗試成功");
 
 } catch (error) {
-  // 2. 憒??葡 Key ?⊥?雿輻 (靘?撠?銝??具ey ?航炊?雯頝臭???
-  // 蝔??歲?圈ㄐ嚗蒂?芸????芋?祆芋撘?  console.warn("?? Firebase ???憭望?嚗ey ?航?⊥??身摰隤扎?, error);
-  console.log("?? ????[璅⊥璅∪?] (Mock Mode)");
+  // 2. 如果這串 Key 無法使用 (例如專案不存在、Key 錯誤、網路不通)
+  // 程式會跳到這裡，並自動切換成模擬模式
+  console.warn("⚠️ Firebase 連線失敗，Key 可能無效或設定錯誤。", error);
+  console.log("🔄 切換至 [模擬模式] (Mock Mode)");
   
   isMockMode = true;
 }
 
 const enableMockMode = () => {
   isMockMode = true;
-  console.log("?? ??????[璅⊥璅∪?] (Mock Mode)");
+  console.log("🔄 手動切換至 [模擬模式] (Mock Mode)");
 };
 
 export { app, auth, db, functions, googleProvider, isMockMode, enableMockMode };

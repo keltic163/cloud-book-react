@@ -1,6 +1,6 @@
-﻿{
-  "name": "CloudLedger ?脰?",
-  "description": "?函??箸?曹澈閮董?穿?頛?蝞∠?鞎∪???湔???臬餈質馱??擖??貊??誑??AI ?箸頛詨???,
+{
+  "name": "CloudLedger 雲記",
+  "description": "您的智慧共享記帳本，輕鬆管理財務。支援收入/支出追蹤、回饋點數紀錄以及 AI 智慧輸入功能。",
   "requestFramePermissions": [
     "camera",
     "microphone"
