@@ -6,6 +6,12 @@ import * as admin from "firebase-admin";
 
 admin.initializeApp();
 
+const ADMIN_EMAIL_ALLOWLIST = new Set<string>([
+  'your.name@gmail.com',
+  's1594622@gmail.com',
+  'chian0163@gmail.com',
+]);
+
 // 1. 定義 Secret
 const geminiApiKey = defineSecret("GEMINI_API_KEY");
 // Optional developer test code: when the frontend sends this exact code as the API Key,
@@ -25,6 +31,11 @@ interface SmartInputRequest {
   text: string;
   categories?: string[];
 }
+
+const isAdminEmail = (email?: string | null) => {
+  if (!email) return false;
+  return ADMIN_EMAIL_ALLOWLIST.has(email.toLowerCase());
+};
 
 // 2. 解析交易的函式
 export const parseTransactionHandler = async (request: any) => {
@@ -163,6 +174,129 @@ export const validateKey = onCall(
   { secrets: [geminiApiKey, devKeyCode] },
   validateKeyHandler
 );
+
+export const adminCheckHandler = async (request: any) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', '請先登入');
+  }
+
+  const email = (request.auth.token?.email as string | undefined) || null;
+  if (!isAdminEmail(email)) {
+    throw new HttpsError('permission-denied', '非管理者帳號');
+  }
+
+  return { ok: true, email };
+};
+
+export const adminCheck = onCall(adminCheckHandler);
+
+export const getVipStatusHandler = async (request: any) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', '請先登入');
+  }
+
+  const email = (request.auth.token?.email as string | undefined) || null;
+  const isAdminVip = isAdminEmail(email);
+  const isPurchaseVip = request.auth.token?.vip === true;
+
+  return {
+    isVip: isAdminVip || isPurchaseVip,
+    sources: {
+      admin: isAdminVip,
+      purchase: isPurchaseVip
+    }
+  };
+};
+
+export const getVipStatus = onCall(getVipStatusHandler);
+
+export const adminGetAnnouncementHandler = async (request: any) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', '請先登入');
+  }
+
+  const email = (request.auth.token?.email as string | undefined) || null;
+  if (!isAdminEmail(email)) {
+    throw new HttpsError('permission-denied', '非管理者帳號');
+  }
+
+  const snap = await admin.firestore().doc('app_settings/announcement').get();
+  if (!snap.exists) {
+    return { exists: false };
+  }
+
+  const data = snap.data() || {};
+  return {
+    exists: true,
+    text: data.text ?? '',
+    isEnabled: Boolean(data.isEnabled),
+    type: data.type ?? 'info',
+    startAt: data.startAt?.toMillis ? data.startAt.toMillis() : null,
+    endAt: data.endAt?.toMillis ? data.endAt.toMillis() : null
+  };
+};
+
+export const adminGetAnnouncement = onCall(adminGetAnnouncementHandler);
+
+export const adminSetAnnouncementHandler = async (request: any) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', '請先登入');
+  }
+
+  const email = (request.auth.token?.email as string | undefined) || null;
+  if (!isAdminEmail(email)) {
+    throw new HttpsError('permission-denied', '非管理者帳號');
+  }
+
+  const payload = request.data as {
+    text?: string;
+    isEnabled?: boolean;
+    type?: 'info' | 'warning' | 'error';
+    startAt?: string | number | null;
+    endAt?: string | number | null;
+  };
+
+  const text = typeof payload.text === 'string' ? payload.text.trim() : '';
+  const isEnabled = Boolean(payload.isEnabled);
+  const type = payload.type === 'warning' || payload.type === 'error' ? payload.type : 'info';
+
+  const toMillis = (value: string | number | null | undefined) => {
+    if (value === null || value === undefined) return null;
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string') {
+      const parsed = Date.parse(value);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+    return null;
+  };
+
+  const startMs = toMillis(payload.startAt);
+  const endMs = toMillis(payload.endAt);
+
+  if (!text) {
+    throw new HttpsError('invalid-argument', '公告內容不可為空');
+  }
+  if (!startMs || !endMs) {
+    throw new HttpsError('invalid-argument', '請設定開始與結束時間');
+  }
+  if (startMs >= endMs) {
+    throw new HttpsError('invalid-argument', '開始時間需早於結束時間');
+  }
+
+  await admin.firestore().doc('app_settings/announcement').set({
+    text,
+    isEnabled,
+    type,
+    startAt: admin.firestore.Timestamp.fromMillis(startMs),
+    endAt: admin.firestore.Timestamp.fromMillis(endMs),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  }, { merge: true });
+
+  return { ok: true };
+};
+
+export const adminSetAnnouncement = onCall(adminSetAnnouncementHandler);
+
 export const onUserCreate = functionsV1.auth.user().onCreate(async (user) => {
   const db = admin.firestore();
   await db.collection('users').doc(user.uid).set({
