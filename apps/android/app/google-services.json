@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "622793086532-e8q65rpud03ep2bu51is3p5nv5mnqs3m.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.krendstudio.cloudledger",
+            "certificate_hash": "ac28268b14a6e4e78b81c93c40f6f4188ecf7fd7"
+          }
+        },
+        {
           "client_id": "622793086532-m0iup9tpbvlhv4l7l8uc42vd8r0jnqp1.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {

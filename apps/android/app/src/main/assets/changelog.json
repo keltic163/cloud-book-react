@@ -1,0 +1,19 @@
+﻿{
+  "versions": [
+    {
+      "version": "3.5.1",
+      "notes": [
+        "Recurring templates enabled",
+        "CSV/JSON export",
+        "Google login for release builds"
+      ]
+    },
+    {
+      "version": "3.5.0",
+      "notes": [
+        "Dashboard calendar view",
+        "Transaction search"
+      ]
+    }
+  ]
+}
