@@ -38,7 +38,7 @@ const AddTransaction: React.FC<Props> = ({ onComplete, autoStartVoice = false })
   const [type, setType] = useState<TransactionType>(TransactionType.EXPENSE);
   const [category, setCategory] = useState<string>('');
   const [description, setDescription] = useState('');
-  const [rewards, setRewards] = useState<string>('0');
+  const [rewards, setRewards] = useState<string>('');
   const [targetUserUid, setTargetUserUid] = useState('');
   const [isRecurring, setIsRecurring] = useState(false);
   const [executeDay, setExecuteDay] = useState<number>(() => new Date().getDate());
@@ -230,7 +230,7 @@ const AddTransaction: React.FC<Props> = ({ onComplete, autoStartVoice = false })
         type,
         category,
         description,
-        rewards: parseFloat(rewards) || 0,
+        rewards: rewards.trim() === '' ? 0 : parseFloat(rewards) || 0,
         date: new Date(date).toISOString(),
         creatorUid: currentUser.uid,
         targetUserUid: targetUserUid || currentUser.uid,
@@ -414,8 +414,8 @@ const AddTransaction: React.FC<Props> = ({ onComplete, autoStartVoice = false })
                   <input
                     type="number"
                     step="0.1"
-                    value={rewards}
-                    onChange={(e) => setRewards(e.target.value)}
+                  value={rewards}
+                  onChange={(e) => setRewards(e.target.value)}
                   className={`${inputClass} h-10 px-3 py-0 text-sm text-slate-600 dark:text-slate-300 leading-4`}
                     placeholder="0"
                   />

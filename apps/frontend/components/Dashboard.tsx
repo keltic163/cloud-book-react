@@ -32,6 +32,17 @@ const Dashboard = () => {
     setDrawerHeight(window.innerHeight * 0.6);
   }, []);
 
+  useEffect(() => {
+    if (!selectedDay) {
+      document.body.style.overflow = '';
+      return;
+    }
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [selectedDay]);
+
   // Calculate Monthly Stats based on currentDate
   const monthlyStats = useMemo(() => {
     let income = 0;

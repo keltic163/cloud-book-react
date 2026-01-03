@@ -105,18 +105,30 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     color: 'bg-blue-500'
   }]);
 
+  const setThemeMeta = (dark: boolean) => {
+    const themeMeta = document.querySelector('meta[name="theme-color"]');
+    if (themeMeta) {
+      themeMeta.setAttribute('content', dark ? '#020617' : '#f8fafc');
+    }
+    const appleStatus = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+    if (appleStatus) {
+      appleStatus.setAttribute('content', dark ? 'black-translucent' : 'default');
+    }
+  };
+
   // --- Theme Initialization ---
   useEffect(() => {
     const savedTheme = localStorage.getItem(STORAGE_KEY_THEME);
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const useDark = savedTheme === 'dark' || (!savedTheme && prefersDark);
     
-    if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
-      setIsDarkMode(true);
+    setIsDarkMode(useDark);
+    if (useDark) {
       document.documentElement.classList.add('dark');
     } else {
-      setIsDarkMode(false);
       document.documentElement.classList.remove('dark');
     }
+    setThemeMeta(useDark);
   }, []);
 
   const toggleTheme = () => {
@@ -129,6 +141,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       document.documentElement.classList.remove('dark');
       localStorage.setItem(STORAGE_KEY_THEME, 'light');
     }
+    setThemeMeta(newMode);
   };
 
   // --- Helper to update User Profile (Firestore or Local) ---
