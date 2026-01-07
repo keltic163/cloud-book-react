@@ -10,15 +10,22 @@ const SystemAnnouncement = () => {
   useEffect(() => {
     if (!db) return;
 
-    const unsub = onSnapshot(doc(db, 'app_settings', 'announcement'), (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data() as AnnouncementType;
-        setAnnouncement(data);
-        checkVisibility(data);
-      } else {
+    const unsub = onSnapshot(
+      doc(db, 'app_settings', 'announcement_web'),
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data() as AnnouncementType;
+          setAnnouncement(data);
+          checkVisibility(data);
+        } else {
+          setIsVisible(false);
+        }
+      },
+      (error) => {
+        console.error('Announcement snapshot error:', error);
         setIsVisible(false);
       }
-    });
+    );
 
     return () => unsub();
   }, []);
@@ -30,8 +37,13 @@ const SystemAnnouncement = () => {
     }
 
     const now = new Date();
-    const start = data.startAt?.toDate ? data.startAt.toDate() : new Date(data.startAt);
-    const end = data.endAt?.toDate ? data.endAt.toDate() : new Date(data.endAt);
+    const start = data.startAt?.toDate ? data.startAt.toDate() : data.startAt ? new Date(data.startAt) : null;
+    const end = data.endAt?.toDate ? data.endAt.toDate() : data.endAt ? new Date(data.endAt) : null;
+
+    if (!start || Number.isNaN(start.getTime()) || !end || Number.isNaN(end.getTime())) {
+      setIsVisible(true);
+      return;
+    }
 
     if (now >= start && now <= end) {
       setIsVisible(true);
