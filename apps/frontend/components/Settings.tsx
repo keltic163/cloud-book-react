@@ -1,4 +1,4 @@
-﻿
+
 import React, { useEffect, useRef, useState } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -1014,7 +1014,7 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
       </SectionCard>
 
       <div className="text-center text-xs text-slate-400 py-4">
-        CloudLedger 雲記 v3.5.2 © 2025 KrendStudio
+        CloudLedger 雲記 v3.5.3 © 2025 KrendStudio
       </div>
 
       {showLedgerSwitcher && (

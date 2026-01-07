@@ -220,7 +220,11 @@ export const adminGetAnnouncementHandler = async (request: any) => {
     throw new HttpsError('permission-denied', '非管理者帳號');
   }
 
-  const snap = await admin.firestore().doc('app_settings/announcement').get();
+  const payload = request.data as { platform?: string } | undefined;
+  const platform = payload?.platform === 'android' ? 'android' : 'web';
+  const docId = platform === 'android' ? 'announcement_android' : 'announcement_web';
+
+  const snap = await admin.firestore().doc(`app_settings/${docId}`).get();
   if (!snap.exists) {
     return { exists: false };
   }
@@ -254,11 +258,14 @@ export const adminSetAnnouncementHandler = async (request: any) => {
     type?: 'info' | 'warning' | 'error';
     startAt?: string | number | null;
     endAt?: string | number | null;
+    platform?: string;
   };
 
   const text = typeof payload.text === 'string' ? payload.text.trim() : '';
   const isEnabled = Boolean(payload.isEnabled);
   const type = payload.type === 'warning' || payload.type === 'error' ? payload.type : 'info';
+  const platform = payload.platform === 'android' ? 'android' : 'web';
+  const docId = platform === 'android' ? 'announcement_android' : 'announcement_web';
 
   const toMillis = (value: string | number | null | undefined) => {
     if (value === null || value === undefined) return null;
@@ -283,7 +290,7 @@ export const adminSetAnnouncementHandler = async (request: any) => {
     throw new HttpsError('invalid-argument', '開始時間需早於結束時間');
   }
 
-  await admin.firestore().doc('app_settings/announcement').set({
+  await admin.firestore().doc(`app_settings/${docId}`).set({
     text,
     isEnabled,
     type,

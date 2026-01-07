@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { Transaction, TransactionType } from '../types';
 
@@ -7,11 +7,18 @@ const TransactionList = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const pageSize = 30;
+  const [visibleCount, setVisibleCount] = useState(pageSize);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const id = setTimeout(() => setDebouncedSearch(search.trim().toLowerCase()), 200);
     return () => clearTimeout(id);
   }, [search]);
+
+  useEffect(() => {
+    setVisibleCount(pageSize);
+  }, [debouncedSearch, transactions.length]);
 
   const filteredTransactions = useMemo(() => {
     if (!debouncedSearch) return transactions;
@@ -23,6 +30,22 @@ const TransactionList = () => {
       return tokens.every((token) => desc.includes(token) || cat.includes(token) || amt.includes(token));
     });
   }, [transactions, debouncedSearch]);
+
+  const hasMore = filteredTransactions.length > visibleCount;
+
+  useEffect(() => {
+    if (!loadMoreRef.current || !hasMore) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisibleCount((prev) => Math.min(prev + pageSize, filteredTransactions.length));
+        }
+      },
+      { rootMargin: '200px' }
+    );
+    observer.observe(loadMoreRef.current);
+    return () => observer.disconnect();
+  }, [hasMore, filteredTransactions.length, pageSize]);
 
   const getCategoryColor = (cat: string) => {
     switch (cat) {
@@ -55,7 +78,9 @@ const TransactionList = () => {
     <div className="space-y-4 pb-24">
       <div className="flex items-center justify-between">
         <h3 className="font-bold text-slate-800 dark:text-slate-100 text-lg transition-colors">近期紀錄</h3>
-        <div className="text-sm text-slate-500 dark:text-slate-400">總計 {transactions.length} / 顯示 {filteredTransactions.length}</div>
+        <div className="text-sm text-slate-500 dark:text-slate-400">
+          總計 {transactions.length} / 符合 {filteredTransactions.length} / 顯示 {Math.min(visibleCount, filteredTransactions.length)}
+        </div>
       </div>
 
       <div className="flex items-center gap-2">
@@ -82,7 +107,7 @@ const TransactionList = () => {
           <div className="py-8 text-center text-slate-500">沒有符合條件的紀錄</div>
         )}
 
-        {filteredTransactions.map((t) => {
+        {filteredTransactions.slice(0, visibleCount).map((t) => {
           const targetUser = getUser(t.targetUserUid || t.creatorUid);
           const isExpense = t.type === TransactionType.EXPENSE;
           return (
@@ -133,6 +158,19 @@ const TransactionList = () => {
           );
         })}
       </div>
+
+      {hasMore && (
+        <div className="flex flex-col items-center gap-3 pt-2">
+          <button
+            type="button"
+            onClick={() => setVisibleCount((prev) => Math.min(prev + pageSize, filteredTransactions.length))}
+            className="px-4 py-2 rounded-full border border-[color:var(--app-border)] dark:border-slate-700 bg-[color:var(--app-surface)] dark:bg-slate-800 text-sm text-slate-600 dark:text-slate-300 hover:border-indigo-300 dark:hover:border-indigo-500/60 transition-colors"
+          >
+            載入更多
+          </button>
+          <div ref={loadMoreRef} className="h-1 w-full" aria-hidden="true" />
+        </div>
+      )}
 
       {editingTransaction && (
         <EditTransactionModal
