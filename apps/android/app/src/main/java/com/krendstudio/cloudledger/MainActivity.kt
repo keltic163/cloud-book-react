@@ -1,4 +1,4 @@
-package com.krendstudio.cloudledger
+﻿package com.krendstudio.cloudledger
 
 import android.app.AlertDialog
 import android.os.Bundle
@@ -29,15 +29,18 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
         CrashReporter.init(applicationContext)
         if (CrashReporter.hasCrashLog(applicationContext)) {
             startActivity(android.content.Intent(this, CrashLogActivity::class.java))
             finish()
             return
         }
+        
         setContent {
             CloudLedgerApp(viewModel = viewModel)
         }
+        
         if (savedInstanceState == null) {
             showAuthMismatchDialogIfNeeded()
         }
@@ -46,8 +49,8 @@ class MainActivity : ComponentActivity() {
     private fun showAuthMismatchDialogIfNeeded() {
         val clearAction = buildAuthMismatchClearAction() ?: return
         AlertDialog.Builder(this)
-            .setTitle("帳號狀態不一致")
-            .setMessage("偵測到 Google 與 Firebase 登入不一致，是否要清除登入狀態重新登入？")
+            .setTitle("帳號登入異常")
+            .setMessage("偵測到 Google 與 Firebase 登入不一致，是否要清除登入與本機資料？")
             .setPositiveButton("清除") { _, _ ->
                 clearAction.invoke()
             }
@@ -83,3 +86,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
+
+
+

@@ -70,7 +70,7 @@ class LedgerRepository(
     }
 
     fun observeSystemAnnouncement(): Flow<SystemAnnouncement?> = callbackFlow {
-        val docRef = firestore.collection("app_settings").document("announcement")
+        val docRef = firestore.collection("app_settings").document("announcement_android")
         val listener = docRef.addSnapshotListener { snapshot, error ->
             if (error != null) {
                 trySend(null)
@@ -456,6 +456,35 @@ class LedgerRepository(
                 .document(templateId)
                 .delete()
                 .await()
+        }
+    }
+
+    suspend fun updateRecurringTemplate(
+        templateId: String,
+        updates: Map<String, Any?>
+    ): Result<Unit> {
+        return runCatching {
+            firestore.collection("recurring_templates")
+                .document(templateId)
+                .update(updates)
+                .await()
+        }
+    }
+
+    suspend fun updateLedgerAlias(
+        userUid: String,
+        ledgerId: String,
+        alias: String,
+        lastLedgerId: String?,
+        savedLedgers: List<SavedLedger>
+    ): Result<Unit> {
+        return runCatching {
+            val safeAlias = alias.ifBlank { "帳本" }
+            val updated = savedLedgers.map { ledger ->
+                if (ledger.id == ledgerId) ledger.copy(alias = safeAlias) else ledger
+            }
+            updateLocalProfile(userUid, lastLedgerId, updated)
+            updateUserProfileRemote(userUid, lastLedgerId, updated)
         }
     }
 

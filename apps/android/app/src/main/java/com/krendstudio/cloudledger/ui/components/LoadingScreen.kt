@@ -1,4 +1,4 @@
-package com.krendstudio.cloudledger.ui.components
+ï»¿package com.krendstudio.cloudledger.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -11,7 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 
 @Composable
-fun LoadingScreen(message: String = "¸ü¤J¤¤...") {
+fun LoadingScreen(message: String = "è¼‰å…¥ä¸­...") {
     Column(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.Center,
@@ -24,3 +24,4 @@ fun LoadingScreen(message: String = "¸ü¤J¤¤...") {
         )
     }
 }
+

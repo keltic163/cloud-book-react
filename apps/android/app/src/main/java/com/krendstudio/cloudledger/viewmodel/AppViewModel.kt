@@ -42,6 +42,11 @@ data class LedgerUiState(
     val isInitializing: Boolean = true
 )
 
+data class AiKeyValidation(
+    val valid: Boolean,
+    val models: List<String>
+)
+
 class AppViewModel(
     private val ledgerRepository: LedgerRepository
 ) : ViewModel() {
@@ -68,6 +73,12 @@ class AppViewModel(
 
     private val _selectedDate = MutableStateFlow<LocalDate?>(null)
     val selectedDate: StateFlow<LocalDate?> = _selectedDate.asStateFlow()
+
+    private val _daySheetOpen = MutableStateFlow(false)
+    val daySheetOpen: StateFlow<Boolean> = _daySheetOpen.asStateFlow()
+
+    private val _forceOnboarding = MutableStateFlow(false)
+    val forceOnboarding: StateFlow<Boolean> = _forceOnboarding.asStateFlow()
 
     private val _announcement = MutableStateFlow<SystemAnnouncement?>(null)
     val announcement: StateFlow<SystemAnnouncement?> = _announcement.asStateFlow()
@@ -227,6 +238,25 @@ class AppViewModel(
         }
     }
 
+    suspend fun updateLedgerAlias(ledgerId: String, alias: String): Result<Unit> {
+        val user = _authState.value.user ?: return Result.failure(IllegalStateException("Missing user"))
+        val trimmed = ledgerId.trim()
+        if (trimmed.isEmpty()) {
+            return Result.failure(IllegalArgumentException("Empty ledger id"))
+        }
+        val saved = _ledgerState.value.savedLedgers
+        val lastLedgerId = _ledgerState.value.currentLedgerId
+        return if (_authState.value.isMockMode) {
+            val updated = saved.map { ledger ->
+                if (ledger.id == trimmed) ledger.copy(alias = alias.ifBlank { "帳本" }) else ledger
+            }
+            ledgerRepository.updateLocalProfile(user.uid, lastLedgerId, updated)
+            Result.success(Unit)
+        } else {
+            ledgerRepository.updateLedgerAlias(user.uid, trimmed, alias, lastLedgerId, saved)
+        }
+    }
+
     suspend fun addCategory(type: TransactionType, category: String): Result<Unit> {
         val ledgerId = _ledgerState.value.currentLedgerId
             ?: return Result.failure(IllegalStateException("Missing ledger"))
@@ -362,6 +392,17 @@ class AppViewModel(
         }
     }
 
+    suspend fun validateAiKey(apiKey: String?): Result<AiKeyValidation> {
+        return runCatching {
+            val callable = FirebaseFunctions.getInstance().getHttpsCallable("validateKey")
+            val result = callable.call(mapOf("apiKey" to apiKey)).await()
+            val data = result.data as? Map<*, *> ?: error("Invalid response")
+            val valid = data["valid"] as? Boolean ?: false
+            val models = (data["models"] as? List<*>)?.mapNotNull { it as? String }.orEmpty()
+            AiKeyValidation(valid, models)
+        }
+    }
+
     suspend fun importTransactions(items: List<TransactionDraft>): Result<Int> {
         val ledgerId = _ledgerState.value.currentLedgerId
             ?: return Result.failure(IllegalStateException("Missing ledger"))
@@ -466,8 +507,34 @@ class AppViewModel(
         return result
     }
 
+    suspend fun updateRecurringTemplate(
+        templateId: String,
+        updates: Map<String, Any?>
+    ): Result<Unit> {
+        val ledgerId = _ledgerState.value.currentLedgerId
+            ?: return Result.failure(IllegalStateException("Missing ledger"))
+        val user = _authState.value.user ?: return Result.failure(IllegalStateException("Missing user"))
+        val result = ledgerRepository.updateRecurringTemplate(templateId, updates)
+        if (result.isSuccess) {
+            ledgerRepository.syncRecurringTemplates(ledgerId, user.uid)
+        }
+        return result
+    }
+
     fun setSelectedDate(date: LocalDate?) {
         _selectedDate.value = date
+    }
+
+    fun setDaySheetOpen(isOpen: Boolean) {
+        _daySheetOpen.value = isOpen
+    }
+
+    fun requestOnboarding() {
+        _forceOnboarding.value = true
+    }
+
+    fun clearOnboardingRequest() {
+        _forceOnboarding.value = false
     }
 
     private fun updateAuthState(user: AppUser?, isMock: Boolean) {

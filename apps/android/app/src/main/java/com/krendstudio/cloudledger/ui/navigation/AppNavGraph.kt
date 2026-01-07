@@ -2,6 +2,8 @@ package com.krendstudio.cloudledger.ui.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -28,9 +30,11 @@ fun AppNavGraph(
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController()
 ) {
+    val forceOnboarding by viewModel.forceOnboarding.collectAsState()
     val targetRoute = when {
         authState.isLoading || ledgerState.isInitializing -> ROUTE_LOADING
         authState.user == null -> ROUTE_WELCOME
+        forceOnboarding -> ROUTE_ONBOARDING
         ledgerState.currentLedgerId == null -> ROUTE_ONBOARDING
         else -> ROUTE_HOME
     }
@@ -54,7 +58,7 @@ fun AppNavGraph(
             WelcomeScreen(viewModel = viewModel)
         }
         composable(ROUTE_ONBOARDING) {
-            OnboardingScreen(viewModel = viewModel, ledgerState = ledgerState)
+            OnboardingScreen(viewModel = viewModel)
         }
         composable(ROUTE_HOME) {
             HomeScreen(viewModel = viewModel, ledgerState = ledgerState)

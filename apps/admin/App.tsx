@@ -13,6 +13,7 @@ const App = () => {
   const [loading, setLoading] = React.useState(true);
   const [backendAllowed, setBackendAllowed] = React.useState<boolean | null>(null);
   const [backendError, setBackendError] = React.useState<string>('');
+  const [marqueePlatform, setMarqueePlatform] = React.useState<'web' | 'android'>('web');
   const [marqueeText, setMarqueeText] = React.useState('');
   const [marqueeEnabled, setMarqueeEnabled] = React.useState(true);
   const [marqueeType, setMarqueeType] = React.useState<'info' | 'warning' | 'error'>('info');
@@ -82,7 +83,7 @@ const App = () => {
       setIsLoadingMarquee(true);
       try {
         const getAnnouncement = httpsCallable(functions, 'adminGetAnnouncement');
-        const res = await getAnnouncement();
+        const res = await getAnnouncement({ platform: marqueePlatform });
         const data = res.data as {
           exists?: boolean;
           text?: string;
@@ -98,6 +99,12 @@ const App = () => {
             setMarqueeType(data.type === 'warning' || data.type === 'error' ? data.type : 'info');
             setMarqueeStart(toLocalInput(data.startAt ?? null));
             setMarqueeEnd(toLocalInput(data.endAt ?? null));
+          } else {
+            setMarqueeText('');
+            setMarqueeEnabled(true);
+            setMarqueeType('info');
+            setMarqueeStart('');
+            setMarqueeEnd('');
           }
         }
       } catch (error) {
@@ -114,7 +121,7 @@ const App = () => {
     return () => {
       cancelled = true;
     };
-  }, [backendAllowed]);
+  }, [backendAllowed, marqueePlatform]);
 
   const handleSaveMarquee = async () => {
     if (!marqueeText.trim()) {
@@ -137,6 +144,7 @@ const App = () => {
         type: marqueeType,
         startAt: marqueeStart,
         endAt: marqueeEnd,
+        platform: marqueePlatform,
       });
       setStatusMessage('已儲存跑馬燈設定');
     } catch (error) {
@@ -239,6 +247,26 @@ const App = () => {
             更新顯示給使用者的公告。
           </div>
           <div className="stack">
+            <label className="muted">
+              平台
+              <div className="actions">
+                <button
+                  className={marqueePlatform === 'web' ? '' : 'secondary'}
+                  onClick={() => setMarqueePlatform('web')}
+                  type="button"
+                >
+                  Web
+                </button>
+                <button
+                  className={marqueePlatform === 'android' ? '' : 'secondary'}
+                  onClick={() => setMarqueePlatform('android')}
+                  type="button"
+                >
+                  Android
+                </button>
+              </div>
+            </label>
+
             <label className="muted">
               啟用狀態
               <div className="actions">

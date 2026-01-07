@@ -62,7 +62,6 @@ android {
         getByName("release") {
             signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
-            // 嘗試在 Release 模式下禁用 Baseline Profile 生成（如果適用）
         }
         getByName("debug") {
             isMinifyEnabled = false
@@ -86,7 +85,9 @@ dependencies {
     implementation(platform("androidx.compose:compose-bom:2024.06.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.navigation:navigation-compose:2.7.7")
     implementation("com.google.android.material:material:1.12.0")
 
@@ -107,8 +108,8 @@ dependencies {
     implementation("androidx.work:work-runtime-ktx:2.9.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+    implementation("io.coil-kt:coil-compose:2.6.0")
 
-    // 明確添加 profileinstaller 確保相容性
     implementation("androidx.profileinstaller:profileinstaller:1.3.1")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
