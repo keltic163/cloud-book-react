@@ -70,7 +70,7 @@ const ChevronRightIcon = ({ className }: { className?: string }) => (
 const SectionCard = ({ title, description, children, defaultOpen = true }: { title: string; description?: string; children: React.ReactNode; defaultOpen?: boolean }) => {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-100 dark:border-slate-800">
+    <div className="bg-[color:var(--app-surface)] dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-[color:var(--app-border)] dark:border-slate-800">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="font-bold text-slate-800 dark:text-slate-100">{title}</h3>
@@ -118,10 +118,10 @@ const CategoryManagerModal = ({ onClose }: { onClose: () => void }) => {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
       <div
-        className="bg-white dark:bg-slate-900 w-full max-w-2xl max-h-[90vh] rounded-2xl shadow-2xl flex flex-col border border-slate-200 dark:border-slate-800 animate-in slide-in-from-bottom-10 duration-300"
+        className="bg-[color:var(--app-surface)] dark:bg-slate-900 w-full max-w-2xl max-h-[90vh] rounded-2xl shadow-2xl flex flex-col border border-[color:var(--app-border)] dark:border-slate-800 animate-in slide-in-from-bottom-10 duration-300"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex justify-between items-center p-5 border-b border-slate-100 dark:border-slate-800">
+        <div className="flex justify-between items-center p-5 border-b border-[color:var(--app-border)] dark:border-slate-800">
           <div className="flex items-center gap-2">
             <TagIcon className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
             <h3 className="font-bold text-lg text-slate-800 dark:text-slate-100">分類管理</h3>
@@ -136,7 +136,7 @@ const CategoryManagerModal = ({ onClose }: { onClose: () => void }) => {
             </button>
             <button
               onClick={onClose}
-              className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+              className="p-2 bg-[color:var(--app-bg)] dark:bg-slate-800 rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
@@ -166,7 +166,7 @@ const CategoryManagerModal = ({ onClose }: { onClose: () => void }) => {
                   value={newExpenseCat}
                   onChange={(e) => setNewExpenseCat(e.target.value)}
                   placeholder="新增支出分類"
-                  className="flex-1 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm focus:ring-2 focus:ring-rose-100 dark:focus:ring-rose-900 outline-none dark:text-white"
+                  className="flex-1 p-2.5 rounded-lg bg-[color:var(--app-bg)] dark:bg-slate-800 border border-[color:var(--app-border)] dark:border-slate-700 text-sm focus:ring-2 focus:ring-rose-100 dark:focus:ring-rose-900 outline-none dark:text-white"
                 />
                 <button type="submit" className="bg-rose-500 text-white px-3.5 rounded-lg hover:bg-rose-600 transition-colors">
                   <PlusIcon className="w-5 h-5" />
@@ -195,7 +195,7 @@ const CategoryManagerModal = ({ onClose }: { onClose: () => void }) => {
                   value={newIncomeCat}
                   onChange={(e) => setNewIncomeCat(e.target.value)}
                   placeholder="新增收入分類"
-                  className="flex-1 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm focus:ring-2 focus:ring-emerald-100 dark:focus:ring-emerald-900 outline-none dark:text-white"
+                  className="flex-1 p-2.5 rounded-lg bg-[color:var(--app-bg)] dark:bg-slate-800 border border-[color:var(--app-border)] dark:border-slate-700 text-sm focus:ring-2 focus:ring-emerald-100 dark:focus:ring-emerald-900 outline-none dark:text-white"
                 />
                 <button type="submit" className="bg-emerald-500 text-white px-3.5 rounded-lg hover:bg-emerald-600 transition-colors">
                   <PlusIcon className="w-5 h-5" />
@@ -604,7 +604,7 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
         return (
           <div
             key={ledger.id}
-            className={`p-3 rounded-xl border transition-all ${isActive ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800 ring-1 ring-indigo-200 dark:ring-indigo-800' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-slate-300'}`}
+            className={`p-3 rounded-xl border transition-all ${isActive ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800 ring-1 ring-indigo-200 dark:ring-indigo-800' : 'bg-[color:var(--app-surface)] dark:bg-slate-800 border-[color:var(--app-border)] dark:border-slate-700 hover:border-slate-300'}`}
           >
             <div className="flex items-center justify-between gap-3">
               {isEditing && showActions ? (
@@ -636,10 +636,10 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
 
               {showActions && (
                 <div className="flex items-center gap-1">
-                  <button onClick={() => copyId(ledger.id)} className="p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg" title="複製 ID">
+                  <button onClick={() => copyId(ledger.id)} className="p-1.5 text-slate-400 hover:bg-[color:var(--app-bg)] dark:hover:bg-slate-700 rounded-lg" title="複製 ID">
                     <CopyIcon className="w-4 h-4" />
                   </button>
-                  <button onClick={() => startEditing(ledger.id, ledger.alias)} className="p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg" title="修改備註">
+                  <button onClick={() => startEditing(ledger.id, ledger.alias)} className="p-1.5 text-slate-400 hover:bg-[color:var(--app-bg)] dark:hover:bg-slate-700 rounded-lg" title="修改備註">
                     <EditIcon className="w-4 h-4" />
                   </button>
                   <button onClick={() => handleLeaveLedger(ledger.id, ledger.alias)} className="p-1.5 text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg" title="退出帳本">
@@ -665,7 +665,7 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
         <div className="flex items-center gap-3">
           <button
             onClick={toggleTheme}
-            className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors"
+            className="p-2 rounded-lg bg-[color:var(--app-bg)] dark:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors"
             aria-label="切換夜間模式"
           >
             {isDarkMode ? <SunIcon className="w-5 h-5" /> : <MoonIcon className="w-5 h-5" />}
@@ -698,7 +698,7 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
 
       <SectionCard title="帳本與分類" description="切換帳本、管理分類並查看成員。">
         <div className="space-y-4">
-          <div className="w-full bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-100 dark:border-slate-800 text-left">
+          <div className="w-full bg-[color:var(--app-surface)] dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-[color:var(--app-border)] dark:border-slate-800 text-left">
             <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">目前帳本</div>
             <div className="flex items-center justify-between mt-2 gap-3">
               <div>
@@ -712,7 +712,7 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
                     e.stopPropagation();
                     if (ledgerId) copyId(ledgerId);
                   }}
-                  className="p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"
+                  className="p-1.5 text-slate-400 hover:bg-[color:var(--app-bg)] dark:hover:bg-slate-700 rounded-lg"
                   title="複製 ID"
                 >
                   <CopyIcon className="w-4 h-4" />
@@ -726,7 +726,7 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
                       startEditing(currentLedger.id, currentLedger.alias);
                     }
                   }}
-                  className="p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"
+                  className="p-1.5 text-slate-400 hover:bg-[color:var(--app-bg)] dark:hover:bg-slate-700 rounded-lg"
                   title="修改備註"
                 >
                   <EditIcon className="w-4 h-4" />
@@ -755,7 +755,7 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
 
           {showLedgerList && renderLedgerList(true)}
 
-          <div className="grid grid-cols-1 gap-4 border-t border-slate-100 dark:border-slate-800 pt-4">
+          <div className="grid grid-cols-1 gap-4 border-t border-[color:var(--app-border)] dark:border-slate-800 pt-4">
             <form onSubmit={handleCreateLedger} className="space-y-2">
               <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">建立新帳本</label>
               <div className="flex gap-2">
@@ -764,7 +764,7 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
                   value={newLedgerName}
                   onChange={(e) => setNewLedgerName(e.target.value)}
                   placeholder="帳本名稱 (例如：旅遊基金)"
-                  className="flex-1 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 outline-none dark:text-white"
+                  className="flex-1 p-2.5 rounded-lg bg-[color:var(--app-bg)] dark:bg-slate-800 border border-[color:var(--app-border)] dark:border-slate-700 text-sm focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 outline-none dark:text-white"
                 />
                 <button
                   type="submit"
@@ -785,7 +785,7 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
                   value={partnerLedgerId}
                   onChange={(e) => setPartnerLedgerId(e.target.value)}
                   placeholder="貼上對方傳來的 ID"
-                  className="flex-1 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 outline-none dark:text-white"
+                  className="flex-1 p-2.5 rounded-lg bg-[color:var(--app-bg)] dark:bg-slate-800 border border-[color:var(--app-border)] dark:border-slate-700 text-sm focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 outline-none dark:text-white"
                 />
                 <button
                   type="submit"
@@ -802,7 +802,7 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
             <button
               type="button"
               onClick={onEnterOnboarding}
-              className="w-full flex items-center justify-between p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-all"
+              className="w-full flex items-center justify-between p-4 bg-[color:var(--app-surface)] dark:bg-slate-800 border border-[color:var(--app-border)] dark:border-slate-700 rounded-xl hover:bg-[color:var(--app-bg)] dark:hover:bg-slate-700 transition-all"
             >
               <div className="text-left">
                 <div className="font-bold text-slate-700 dark:text-slate-200">初次設定 / 加入帳本</div>
@@ -814,7 +814,7 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
 
           <button
             onClick={() => setShowCategoryModal(true)}
-            className="w-full flex items-center justify-between p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:border-indigo-200 dark:hover:border-indigo-800 transition-all group"
+            className="w-full flex items-center justify-between p-4 bg-[color:var(--app-surface)] dark:bg-slate-800 border border-[color:var(--app-border)] dark:border-slate-700 rounded-xl hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:border-indigo-200 dark:hover:border-indigo-800 transition-all group"
           >
             <div className="flex items-center gap-3">
               <div className="p-2 bg-indigo-100 dark:bg-indigo-900/40 rounded-lg text-indigo-600 dark:text-indigo-400">
@@ -828,13 +828,13 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
             <ChevronRightIcon className="w-5 h-5 text-slate-400 group-hover:text-indigo-500 group-hover:translate-x-1 transition-all" />
           </button>
 
-          <div className="space-y-2 border-t border-slate-100 dark:border-slate-800 pt-4">
+          <div className="space-y-2 border-t border-[color:var(--app-border)] dark:border-slate-800 pt-4">
             <div className="flex items-center justify-between">
               <div className="font-semibold text-slate-800 dark:text-slate-100">目前帳本成員 ({users.length})</div>
             </div>
             <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
               {users.map((u, idx) => (
-                <div key={u.uid || idx} className="flex items-center justify-between group p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800">
+                <div key={u.uid || idx} className="flex items-center justify-between group p-2 rounded-lg hover:bg-[color:var(--app-bg)] dark:hover:bg-slate-800">
                   <div className="flex items-center gap-3">
                     <div className="relative">
                       <img src={u.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.displayName}`} className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700" alt={u.displayName || ''} />
@@ -857,7 +857,7 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
         ) : (
           <div className="space-y-3">
             {recurringTemplates.map((t) => (
-              <div key={t.id} className="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+              <div key={t.id} className="p-3 rounded-xl border border-[color:var(--app-border)] dark:border-slate-700 bg-[color:var(--app-surface)] dark:bg-slate-800">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{t.title || '固定收支'}</div>
@@ -873,7 +873,7 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
                     <div className="flex flex-col gap-2">
                       <button
                         onClick={() => openRecurringEditor(t)}
-                        className="px-2 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
+                        className="px-2 py-1.5 text-xs rounded-lg border border-[color:var(--app-border)] dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-[color:var(--app-bg)] dark:hover:bg-slate-700"
                       >
                         編輯
                       </button>
@@ -892,7 +892,7 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
                         className="sr-only"
                       />
                       <div className={`relative w-11 h-6 rounded-full transition-colors ${t.isActive ? 'bg-indigo-600' : 'bg-gray-200'}`}>
-                        <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${t.isActive ? 'translate-x-5' : ''}`}></span>
+                        <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-[color:var(--app-surface)] shadow transition-transform ${t.isActive ? 'translate-x-5' : ''}`}></span>
                       </div>
                     </label>
                   </div>
@@ -910,7 +910,7 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
         <div className="grid grid-cols-2 gap-3">
           <button
             onClick={handleExportJSON}
-            className="flex flex-col items-center justify-center p-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:border-indigo-200 dark:hover:border-indigo-800 transition-all gap-2"
+            className="flex flex-col items-center justify-center p-4 bg-[color:var(--app-bg)] dark:bg-slate-800 border border-[color:var(--app-border)] dark:border-slate-700 rounded-xl hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:border-indigo-200 dark:hover:border-indigo-800 transition-all gap-2"
           >
             <DownloadIcon className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">匯出 JSON</span>
@@ -919,7 +919,7 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
 
           <button
             onClick={handleExportCSV}
-            className="flex flex-col items-center justify-center p-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-emerald-50 dark:hover:bg-emerald-900/20 hover:border-emerald-200 dark:hover:border-emerald-800 transition-all gap-2"
+            className="flex flex-col items-center justify-center p-4 bg-[color:var(--app-bg)] dark:bg-slate-800 border border-[color:var(--app-border)] dark:border-slate-700 rounded-xl hover:bg-emerald-50 dark:hover:bg-emerald-900/20 hover:border-emerald-200 dark:hover:border-emerald-800 transition-all gap-2"
           >
             <FileTextIcon className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">匯出 CSV</span>
@@ -929,10 +929,10 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
 
         <button
           onClick={() => fileInputRef.current?.click()}
-          className="w-full flex items-center justify-center gap-2 p-3 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-slate-700 dark:text-slate-300 font-medium shadow-sm"
+          className="w-full flex items-center justify-center gap-2 p-3 bg-[color:var(--app-surface)] dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl hover:bg-[color:var(--app-bg)] dark:hover:bg-slate-800 transition-colors text-slate-700 dark:text-slate-300 font-medium shadow-sm"
         >
           <UploadIcon className="w-4 h-4" />
-          匯入 CSV 資料
+          匯入 CSV/JSON 資料
         </button>
         <input type="file" ref={fileInputRef} onChange={handleImport} accept=".csv" className="hidden" />
       </SectionCard>
@@ -947,10 +947,10 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
                 value={apiKeyInput}
                 onChange={(e) => setApiKeyInput(e.target.value)}
                 placeholder="輸入 API Key 或開發測試代碼 (僅本地儲存)"
-                className="flex-1 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 outline-none dark:text-white"
+                className="flex-1 p-2.5 rounded-lg bg-[color:var(--app-bg)] dark:bg-slate-800 border border-[color:var(--app-border)] dark:border-slate-700 text-sm focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 outline-none dark:text-white"
               />
               <button onClick={saveKey} className="px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700">儲存</button>
-              <button onClick={clearKey} className="px-3 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg text-sm hover:bg-slate-200">移除</button>
+              <button onClick={clearKey} className="px-3 py-2 bg-[color:var(--app-bg)] dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg text-sm hover:bg-slate-200">移除</button>
             </div>
             <div className="text-[12px] text-slate-400 mt-1">提示：輸入後只會存在於本地瀏覽器。</div>
           </div>
@@ -966,7 +966,7 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
               <div className="mt-3">
                 <label className="text-xs font-semibold text-slate-400 mb-2 block">Model</label>
                 <div className="flex gap-2 items-center">
-                  <select value={modelSelected} onChange={(e) => setModelSelected(e.target.value)} className="flex-1 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm outline-none">
+                  <select value={modelSelected} onChange={(e) => setModelSelected(e.target.value)} className="flex-1 p-2.5 rounded-lg bg-[color:var(--app-bg)] dark:bg-slate-800 border border-[color:var(--app-border)] dark:border-slate-700 text-sm outline-none">
                     {models.map((m) => <option key={m} value={m}>{m}</option>)}
                   </select>
                   <button onClick={saveModel} className="px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700">儲存模型</button>
@@ -984,7 +984,7 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
               <label className="inline-flex relative items-center cursor-pointer">
                 <input type="checkbox" checked={enabled} onChange={toggleEnabled} className="sr-only" />
                 <div className={`relative w-11 h-6 rounded-full transition-colors ${enabled ? 'bg-indigo-600' : 'bg-gray-200'}`}>
-                  <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${enabled ? 'translate-x-5' : ''}`}></span>
+                  <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-[color:var(--app-surface)] shadow transition-transform ${enabled ? 'translate-x-5' : ''}`}></span>
                 </div>
               </label>
             </div>
@@ -994,7 +994,7 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
 
       <button
         onClick={() => setShowChangelog(true)}
-        className="w-full flex items-center justify-between p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:border-indigo-200 dark:hover:border-indigo-800 transition-all group"
+        className="w-full flex items-center justify-between p-4 bg-[color:var(--app-surface)] dark:bg-slate-800 border border-[color:var(--app-border)] dark:border-slate-700 rounded-xl hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:border-indigo-200 dark:hover:border-indigo-800 transition-all group"
       >
         <div className="text-left">
           <div className="font-bold text-slate-700 dark:text-slate-200 group-hover:text-indigo-700 dark:group-hover:text-indigo-300">更新紀錄</div>
@@ -1006,7 +1006,7 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
       <SectionCard title="聯絡信箱" description="有任何問題，歡迎來信。">
         <a
           href="mailto:chian0163@gmail.com"
-          className="flex items-center justify-between rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-3 text-sm text-slate-700 dark:text-slate-200 hover:border-indigo-300 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors"
+          className="flex items-center justify-between rounded-xl border border-[color:var(--app-border)] dark:border-slate-700 bg-[color:var(--app-bg)] dark:bg-slate-800 px-4 py-3 text-sm text-slate-700 dark:text-slate-200 hover:border-indigo-300 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors"
         >
           <span>chian0163@gmail.com</span>
           <span className="text-xs text-slate-400">寄信</span>
@@ -1020,20 +1020,20 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
       {showLedgerSwitcher && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setShowLedgerSwitcher(false)}>
           <div
-            className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-2xl flex flex-col border border-slate-200 dark:border-slate-800 animate-in slide-in-from-bottom-10 duration-300"
+            className="bg-[color:var(--app-surface)] dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-2xl flex flex-col border border-[color:var(--app-border)] dark:border-slate-800 animate-in slide-in-from-bottom-10 duration-300"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-4 border-b border-slate-100 dark:border-slate-800">
+            <div className="p-4 border-b border-[color:var(--app-border)] dark:border-slate-800">
               <div className="font-bold text-slate-800 dark:text-slate-100">選擇您的帳本</div>
               <div className="text-xs text-slate-400 mt-1">切換後會回到首頁</div>
             </div>
             <div className="p-4 space-y-2 max-h-[60vh] overflow-y-auto">
               {renderLedgerList(false, () => setShowLedgerSwitcher(false))}
             </div>
-            <div className="p-4 border-t border-slate-100 dark:border-slate-800">
+            <div className="p-4 border-t border-[color:var(--app-border)] dark:border-slate-800">
               <button
                 onClick={() => setShowLedgerSwitcher(false)}
-                className="w-full px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm"
+                className="w-full px-3 py-2 rounded-lg bg-[color:var(--app-bg)] dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm"
               >
                 關閉
               </button>
@@ -1045,7 +1045,7 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
       {pendingSwitchId && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setPendingSwitchId(null)}>
           <div
-            className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-4"
+            className="bg-[color:var(--app-surface)] dark:bg-slate-900 w-full max-w-sm rounded-2xl shadow-2xl border border-[color:var(--app-border)] dark:border-slate-800 p-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="font-bold text-slate-800 dark:text-slate-100">切換帳本</div>
@@ -1055,7 +1055,7 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
             <div className="mt-4 flex gap-2">
               <button
                 onClick={() => setPendingSwitchId(null)}
-                className="flex-1 px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm"
+                className="flex-1 px-3 py-2 rounded-lg bg-[color:var(--app-bg)] dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm"
               >
                 取消
               </button>
@@ -1076,7 +1076,7 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
       {editingRecurring && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setEditingRecurring(null)}>
           <div
-            className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-4"
+            className="bg-[color:var(--app-surface)] dark:bg-slate-900 w-full max-w-lg rounded-2xl shadow-2xl border border-[color:var(--app-border)] dark:border-slate-800 p-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="font-bold text-slate-800 dark:text-slate-100">編輯固定收支</div>
@@ -1087,7 +1087,7 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
                   type="text"
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
-                  className="w-full p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm outline-none"
+                  className="w-full p-2.5 rounded-lg bg-[color:var(--app-bg)] dark:bg-slate-800 border border-[color:var(--app-border)] dark:border-slate-700 text-sm outline-none"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -1098,7 +1098,7 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
                     step="0.01"
                     value={editAmount}
                     onChange={(e) => setEditAmount(e.target.value)}
-                    className="w-full p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm outline-none"
+                    className="w-full p-2.5 rounded-lg bg-[color:var(--app-bg)] dark:bg-slate-800 border border-[color:var(--app-border)] dark:border-slate-700 text-sm outline-none"
                   />
                 </div>
                 <div>
@@ -1106,7 +1106,7 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
                   <select
                     value={editType}
                     onChange={(e) => setEditType(e.target.value as 'expense' | 'income')}
-                    className="w-full p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm outline-none"
+                    className="w-full p-2.5 rounded-lg bg-[color:var(--app-bg)] dark:bg-slate-800 border border-[color:var(--app-border)] dark:border-slate-700 text-sm outline-none"
                   >
                     <option value="expense">支出</option>
                     <option value="income">收入</option>
@@ -1118,7 +1118,7 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
                 <select
                   value={editCategory}
                   onChange={(e) => setEditCategory(e.target.value)}
-                  className="w-full p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm outline-none"
+                  className="w-full p-2.5 rounded-lg bg-[color:var(--app-bg)] dark:bg-slate-800 border border-[color:var(--app-border)] dark:border-slate-700 text-sm outline-none"
                 >
                   {(editType === 'expense' ? expenseCategories : incomeCategories).map((c) => (
                     <option key={c} value={c}>{c}</option>
@@ -1131,7 +1131,7 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
                   <select
                     value={editExecuteDay}
                     onChange={(e) => setEditExecuteDay(Number(e.target.value))}
-                    className="w-full p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm outline-none"
+                    className="w-full p-2.5 rounded-lg bg-[color:var(--app-bg)] dark:bg-slate-800 border border-[color:var(--app-border)] dark:border-slate-700 text-sm outline-none"
                   >
                     {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
                       <option key={d} value={d}>{d} 號</option>
@@ -1145,7 +1145,7 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
                     min={1}
                     value={editIntervalMonths}
                     onChange={(e) => setEditIntervalMonths(Number(e.target.value))}
-                    className="w-full p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm outline-none"
+                    className="w-full p-2.5 rounded-lg bg-[color:var(--app-bg)] dark:bg-slate-800 border border-[color:var(--app-border)] dark:border-slate-700 text-sm outline-none"
                   />
                 </div>
               </div>
@@ -1155,14 +1155,14 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
                   <button
                     type="button"
                     onClick={() => setEditRunMode('continuous')}
-                    className={`flex-1 px-3 py-2 rounded-lg text-sm border ${editRunMode === 'continuous' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'}`}
+                    className={`flex-1 px-3 py-2 rounded-lg text-sm border ${editRunMode === 'continuous' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-[color:var(--app-surface)] dark:bg-slate-800 border-[color:var(--app-border)] dark:border-slate-700 text-slate-600 dark:text-slate-300'}`}
                   >
                     持續
                   </button>
                   <button
                     type="button"
                     onClick={() => setEditRunMode('limited')}
-                    className={`flex-1 px-3 py-2 rounded-lg text-sm border ${editRunMode === 'limited' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'}`}
+                    className={`flex-1 px-3 py-2 rounded-lg text-sm border ${editRunMode === 'limited' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-[color:var(--app-surface)] dark:bg-slate-800 border-[color:var(--app-border)] dark:border-slate-700 text-slate-600 dark:text-slate-300'}`}
                   >
                     指定次數
                   </button>
@@ -1173,7 +1173,7 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
                     min={1}
                     value={editTotalRuns}
                     onChange={(e) => setEditTotalRuns(e.target.value)}
-                    className="w-full p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm outline-none mt-2"
+                    className="w-full p-2.5 rounded-lg bg-[color:var(--app-bg)] dark:bg-slate-800 border border-[color:var(--app-border)] dark:border-slate-700 text-sm outline-none mt-2"
                     placeholder="例如：12"
                   />
                 )}
@@ -1182,7 +1182,7 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
             <div className="mt-4 flex gap-2">
               <button
                 onClick={() => setEditingRecurring(null)}
-                className="flex-1 px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm"
+                className="flex-1 px-3 py-2 rounded-lg bg-[color:var(--app-bg)] dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm"
               >
                 取消
               </button>
@@ -1200,14 +1200,14 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
       {showChangelog && (
         <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setShowChangelog(false)}>
           <div
-            className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-4"
+            className="bg-[color:var(--app-surface)] dark:bg-slate-900 w-full max-w-lg rounded-2xl shadow-2xl border border-[color:var(--app-border)] dark:border-slate-800 p-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="font-bold text-slate-800 dark:text-slate-100">更新紀錄</div>
             <div className="mt-3 space-y-4 max-h-[60vh] overflow-y-auto">
               {isLoadingChangelog && <div className="text-sm text-slate-500">載入中...</div>}
               {!isLoadingChangelog && changelog?.versions?.map((v: any) => (
-                <div key={v.version} className="border border-slate-200 dark:border-slate-700 rounded-xl p-3">
+                <div key={v.version} className="border border-[color:var(--app-border)] dark:border-slate-700 rounded-xl p-3">
                   <div className="flex items-center justify-between">
                     <div className="font-semibold text-slate-800 dark:text-slate-100">v{v.version}</div>
                     {v.date && <div className="text-xs text-slate-400">{v.date}</div>}
@@ -1225,7 +1225,7 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
             </div>
             <button
               onClick={() => setShowChangelog(false)}
-              className="mt-4 w-full px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm"
+              className="mt-4 w-full px-3 py-2 rounded-lg bg-[color:var(--app-bg)] dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm"
             >
               關閉
             </button>
@@ -1239,3 +1239,5 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
 };
 
 export default Settings;
+
+

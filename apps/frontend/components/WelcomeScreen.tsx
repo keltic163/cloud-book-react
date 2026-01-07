@@ -6,8 +6,8 @@ const WelcomeScreen: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-br from-indigo-500 to-purple-600 text-white">
-      <div className="bg-white p-8 rounded-2xl shadow-2xl text-center max-w-sm w-full animate-in fade-in zoom-in-95 duration-500">
-        <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-white p-2 shadow-md">
+      <div className="bg-[color:var(--app-surface)] p-8 rounded-2xl shadow-2xl text-center max-w-sm w-full animate-in fade-in zoom-in-95 duration-500">
+        <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-[color:var(--app-surface)] p-2 shadow-md">
           <img src="/apple-touch-icon.png" alt="CloudLedger" className="w-full h-full object-contain" />
         </div>
         <h1 className="text-3xl font-bold text-slate-800 mb-2">CloudLedger 雲記</h1>
@@ -23,9 +23,9 @@ const WelcomeScreen: React.FC = () => {
           >
             {loading ? (
               <span className="flex items-center gap-2">
-                <span className="w-2 h-2 bg-white rounded-full animate-bounce"></span>
-                <span className="w-2 h-2 bg-white rounded-full animate-bounce delay-75"></span>
-                <span className="w-2 h-2 bg-white rounded-full animate-bounce delay-150"></span>
+                <span className="w-2 h-2 bg-[color:var(--app-surface)] rounded-full animate-bounce"></span>
+                <span className="w-2 h-2 bg-[color:var(--app-surface)] rounded-full animate-bounce delay-75"></span>
+                <span className="w-2 h-2 bg-[color:var(--app-surface)] rounded-full animate-bounce delay-150"></span>
                 登入中...
               </span>
             ) : (
@@ -39,7 +39,7 @@ const WelcomeScreen: React.FC = () => {
           <button
             onClick={enterMockMode}
             disabled={loading}
-            className="w-full bg-slate-100 text-slate-600 py-3 px-4 rounded-xl font-medium text-sm hover:bg-slate-200 transition-all"
+            className="w-full bg-[color:var(--app-bg)] text-slate-600 py-3 px-4 rounded-xl font-medium text-sm hover:bg-slate-200 transition-all"
           >
             試用演示模式 (免登入)
           </button>
@@ -54,3 +54,5 @@ const WelcomeScreen: React.FC = () => {
 };
 
 export default WelcomeScreen;
+
+

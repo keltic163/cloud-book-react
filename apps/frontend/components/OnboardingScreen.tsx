@@ -74,7 +74,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onDone }) => {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gradient-to-br from-amber-100 via-rose-100 to-sky-100 text-slate-900">
-      <div className="w-full max-w-md bg-white/90 backdrop-blur rounded-2xl shadow-xl p-6 sm:p-8">
+      <div className="w-full max-w-md bg-[color:var(--app-surface)]/90 backdrop-blur rounded-2xl shadow-xl p-6 sm:p-8">
         <div className="flex items-center gap-3 mb-4">
           <div>
             <h1 className="text-xl font-bold">開始使用 CloudLedger</h1>
@@ -84,7 +84,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onDone }) => {
 
         <div className="space-y-4">
           {savedLedgers.length > 0 && (
-            <div className="rounded-xl border border-slate-200 p-4">
+            <div className="rounded-xl border border-[color:var(--app-border)] p-4">
               <h2 className="text-sm font-semibold text-slate-700 mb-2">選擇現有帳本</h2>
               <div className="space-y-2">
                 {savedLedgers.map((ledger) => (
@@ -92,7 +92,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onDone }) => {
                     key={ledger.id}
                     onClick={() => handleSelectLedger(ledger.id)}
                     disabled={busy}
-                    className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 transition text-left disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface)] hover:bg-[color:var(--app-bg)] transition text-left disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     <div>
                       <div className="text-sm font-semibold text-slate-800">{ledger.alias}</div>
@@ -113,13 +113,13 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onDone }) => {
           )}
 
           {(showJoin || savedLedgers.length === 0) && (
-            <div className="rounded-xl border border-slate-200 p-4">
+            <div className="rounded-xl border border-[color:var(--app-border)] p-4">
               <h2 className="text-sm font-semibold text-slate-700 mb-2">加入帳本</h2>
               <input
                 value={inviteCode}
                 onChange={(e) => setInviteCode(e.target.value)}
                 placeholder="輸入邀請碼"
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                className="w-full border border-[color:var(--app-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
               />
               <button
                 onClick={handleJoin}
@@ -131,13 +131,13 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onDone }) => {
             </div>
           )}
 
-          <div className="rounded-xl border border-slate-200 p-4">
+          <div className="rounded-xl border border-[color:var(--app-border)] p-4">
             <h2 className="text-sm font-semibold text-slate-700 mb-2">建立新帳本</h2>
             <input
               value={ledgerName}
               onChange={(e) => setLedgerName(e.target.value)}
               placeholder="帳本名稱（可留空）"
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+              className="w-full border border-[color:var(--app-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
             />
             <button
               onClick={handleCreate}
@@ -160,3 +160,5 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onDone }) => {
 };
 
 export default OnboardingScreen;
+
+

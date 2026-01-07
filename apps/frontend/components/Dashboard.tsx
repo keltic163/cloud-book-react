@@ -218,7 +218,7 @@ const Dashboard = () => {
       case '薪資': return 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400';
       case '娛樂': return 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400';
       case '投資': return 'bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-400';
-      default: return 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300';
+      default: return 'bg-[color:var(--app-bg)] text-slate-600 dark:bg-slate-700 dark:text-slate-300';
     }
   };
   
@@ -234,13 +234,13 @@ const Dashboard = () => {
       <SystemAnnouncement />
 
       {/* Calendar View */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-100 dark:border-slate-800 relative z-0 transition-colors">
+      <div className="bg-[color:var(--app-surface)] dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-[color:var(--app-border)] dark:border-slate-800 relative z-0 transition-colors">
         <div className="flex items-center justify-between mb-4 px-1">
            <h3 className="font-bold text-slate-800 dark:text-white">收支日曆</h3>
-           <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800 rounded-lg p-1">
+           <div className="flex items-center gap-3 bg-[color:var(--app-bg)] dark:bg-slate-800 rounded-lg p-1">
              <button 
                onClick={() => changeMonth(-1)} 
-               className="p-1 hover:bg-white dark:hover:bg-slate-700 rounded-md transition-colors text-slate-500 dark:text-slate-400"
+               className="p-1 hover:bg-[color:var(--app-surface)] dark:hover:bg-slate-700 rounded-md transition-colors text-slate-500 dark:text-slate-400"
                aria-label="上一月"
              >
                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
@@ -248,7 +248,7 @@ const Dashboard = () => {
              <span className="text-sm font-semibold text-slate-700 dark:text-slate-200 w-24 text-center" aria-live="polite">{monthLabel}</span>
              <button 
                onClick={() => changeMonth(1)} 
-               className="p-1 hover:bg-white dark:hover:bg-slate-700 rounded-md transition-colors text-slate-500 dark:text-slate-400"
+               className="p-1 hover:bg-[color:var(--app-surface)] dark:hover:bg-slate-700 rounded-md transition-colors text-slate-500 dark:text-slate-400"
                aria-label="下一月"
              >
                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
@@ -280,7 +280,7 @@ const Dashboard = () => {
                  className={`aspect-square rounded-lg border flex flex-col items-center justify-between p-1 transition-all cursor-pointer select-none
                     ${isSelected ? 'bg-indigo-600 border-indigo-600 ring-2 ring-indigo-200 dark:ring-indigo-900 z-10' : ''}
                     ${!isSelected && isToday ? 'bg-indigo-50 border-indigo-200 dark:bg-indigo-900/20 dark:border-indigo-800' : ''}
-                    ${!isSelected && !isToday ? 'bg-white border-slate-50 hover:border-slate-300 dark:bg-slate-800 dark:border-slate-700 dark:hover:border-slate-600' : ''}
+                    ${!isSelected && !isToday ? 'bg-[color:var(--app-surface)] border-slate-50 hover:border-slate-300 dark:bg-slate-800 dark:border-slate-700 dark:hover:border-slate-600' : ''}
                  `}
                  role="gridcell"
                  aria-label={`${currentDate.getMonth() + 1}月${item.day}日, 收入 ${item.data.income}元, 支出 ${item.data.expense}元`}
@@ -309,7 +309,7 @@ const Dashboard = () => {
 
       {/* Monthly Balance Card */}
       <div 
-        className="relative bg-gradient-to-br from-sky-50 via-white to-indigo-100 dark:from-slate-800 dark:to-slate-900 rounded-2xl p-6 text-slate-900 dark:text-white shadow-lg border border-slate-200/60 dark:border-transparent cursor-grab active:cursor-grabbing"
+        className="relative bg-gradient-to-br from-sky-50 via-white to-indigo-100 dark:from-slate-800 dark:to-slate-900 rounded-2xl p-6 text-slate-900 dark:text-white shadow-lg border border-[color:var(--app-border)]/60 dark:border-transparent cursor-grab active:cursor-grabbing"
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
         role="region"
@@ -338,7 +338,7 @@ const Dashboard = () => {
           {monthlyStats.balance >= 0 ? '+' : ''}{monthlyStats.balance.toLocaleString()}
         </div>
         
-        <div className="grid grid-cols-2 gap-4 border-t border-slate-200/80 dark:border-slate-700/50 pt-4">
+        <div className="grid grid-cols-2 gap-4 border-t border-[color:var(--app-border)]/80 dark:border-slate-700/50 pt-4">
           <div>
             <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 mb-0.5">
               <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
@@ -404,11 +404,11 @@ const Dashboard = () => {
             >
                 <div 
                   style={{ height: `${drawerHeight}px` }}
-                  className="bg-slate-50 dark:bg-slate-900 w-full max-w-md rounded-t-2xl shadow-[0_-5px_25px_-5px_rgba(0,0,0,0.1)] flex flex-col pointer-events-auto animate-in slide-in-from-bottom-full duration-300 transition-[height] ease-out will-change-[height]"
+                  className="bg-[color:var(--app-bg)] dark:bg-slate-900 w-full max-w-md rounded-t-2xl shadow-[0_-5px_25px_-5px_rgba(0,0,0,0.1)] flex flex-col pointer-events-auto animate-in slide-in-from-bottom-full duration-300 transition-[height] ease-out will-change-[height]"
                 >
                     {/* Drawer Header (Draggable) */}
                     <div 
-                      className="p-4 bg-white dark:bg-slate-900 rounded-t-2xl border-b border-slate-100 dark:border-slate-800 flex flex-col sticky top-0 z-10 cursor-row-resize select-none"
+                      className="p-4 bg-[color:var(--app-surface)] dark:bg-slate-900 rounded-t-2xl border-b border-[color:var(--app-border)] dark:border-slate-800 flex flex-col sticky top-0 z-10 cursor-row-resize select-none"
                       style={{ touchAction: 'none' }} /* PREVENTS PULL-TO-REFRESH */
                       onPointerDown={handleDragStart}
                     >
@@ -426,7 +426,7 @@ const Dashboard = () => {
                             </div>
                             <button 
                                 onClick={() => setSelectedDay(null)}
-                                className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                                className="p-2 bg-[color:var(--app-bg)] dark:bg-slate-800 rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
                                 aria-label="關閉"
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -435,7 +435,7 @@ const Dashboard = () => {
                     </div>
 
                     {/* Drawer Content (Scrollable) */}
-                    <div className="p-4 overflow-y-auto flex-1 bg-slate-50 dark:bg-slate-950">
+                    <div className="p-4 overflow-y-auto flex-1 bg-[color:var(--app-bg)] dark:bg-slate-950">
                         {selectedDayTransactions.length > 0 ? (
                             <div className="space-y-3 pb-safe">
                                 {selectedDayTransactions.map(t => {
@@ -445,7 +445,7 @@ const Dashboard = () => {
                                         <div 
                                             key={t.id} 
                                             onClick={() => setEditingTxId(t.id)}
-                                            className="group relative bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between transition-all active:scale-[0.98] cursor-pointer"
+                                            className="group relative bg-[color:var(--app-surface)] dark:bg-slate-900 p-3.5 rounded-xl border border-[color:var(--app-border)] dark:border-slate-800 shadow-sm flex items-center justify-between transition-all active:scale-[0.98] cursor-pointer"
                                             role="listitem"
                                             aria-label={`${t.description}，金額 ${isExpense ? '-' : '+'}${t.amount.toLocaleString()}元，被記帳人 ${user?.displayName || '未知使用者'}`}
                                             tabIndex={0}
@@ -512,3 +512,5 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+
+

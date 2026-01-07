@@ -100,7 +100,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const setThemeMeta = (dark: boolean) => {
     const themeMeta = document.querySelector('meta[name="theme-color"]');
     if (themeMeta) {
-      themeMeta.setAttribute('content', dark ? '#020617' : '#f8fafc');
+      themeMeta.setAttribute('content', dark ? '#020617' : '#f5f2eb');
     }
     const appleStatus = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
     if (appleStatus) {

@@ -265,11 +265,11 @@ const AddTransaction: React.FC<Props> = ({ onComplete, autoStartVoice = false })
     }
   };
 
-  const inputClass = 'w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 dark:text-slate-100 transition-colors';
+  const inputClass = 'w-full rounded-lg border border-[color:var(--app-border)] dark:border-slate-700 bg-[color:var(--app-bg)] dark:bg-slate-800 focus:bg-[color:var(--app-surface)] dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 dark:text-slate-100 transition-colors';
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden transition-colors">
-      <div className="flex border-b border-slate-100 dark:border-slate-800">
+    <div className="bg-[color:var(--app-surface)] dark:bg-slate-900 rounded-2xl shadow-sm border border-[color:var(--app-border)] dark:border-slate-800 overflow-hidden transition-colors">
+      <div className="flex border-b border-[color:var(--app-border)] dark:border-slate-800">
         {isAIEnabled && (
           <button
             onClick={() => setMode('smart')}
@@ -298,12 +298,12 @@ const AddTransaction: React.FC<Props> = ({ onComplete, autoStartVoice = false })
                   value={smartInput}
                   onChange={(e) => setSmartInput(e.target.value)}
                   placeholder="例：昨天晚餐 義大利麵 500 折扣 20"
-                  className="w-full p-3 pb-12 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 min-h-[120px] text-slate-900 dark:text-slate-100 placeholder:text-slate-400 resize-none transition-colors"
+                  className="w-full p-3 pb-12 rounded-xl border border-[color:var(--app-border)] dark:border-slate-700 bg-[color:var(--app-bg)] dark:bg-slate-800 focus:bg-[color:var(--app-surface)] dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 min-h-[120px] text-slate-900 dark:text-slate-100 placeholder:text-slate-400 resize-none transition-colors"
                 />
                 <button
                   type="button"
                   onClick={handleVoiceInput}
-                  className={`absolute bottom-3 right-3 p-2 rounded-full transition-all duration-200 shadow-sm ${isListening ? 'bg-rose-500 text-white animate-pulse shadow-rose-200' : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-600'}`}
+                  className={`absolute bottom-3 right-3 p-2 rounded-full transition-all duration-200 shadow-sm ${isListening ? 'bg-rose-500 text-white animate-pulse shadow-rose-200' : 'bg-[color:var(--app-surface)] dark:bg-slate-700 text-slate-500 dark:text-slate-300 hover:bg-[color:var(--app-bg)] dark:hover:bg-slate-600'}`}
                   title="語音輸入"
                 >
                   {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
@@ -333,18 +333,18 @@ const AddTransaction: React.FC<Props> = ({ onComplete, autoStartVoice = false })
           <form onSubmit={handleManualSubmit} className="space-y-4">
             
             {/* Type Toggle */}
-            <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg mb-4">
+            <div className="flex bg-[color:var(--app-bg)] dark:bg-slate-800 p-1 rounded-lg mb-4">
               <button
                 type="button"
                 onClick={() => setType(TransactionType.EXPENSE)}
-                className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-all ${type === TransactionType.EXPENSE ? 'bg-white dark:bg-slate-700 text-rose-600 dark:text-rose-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
+                className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-all ${type === TransactionType.EXPENSE ? 'bg-[color:var(--app-surface)] dark:bg-slate-700 text-rose-600 dark:text-rose-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
               >
                 支出
               </button>
               <button
                 type="button"
                 onClick={() => setType(TransactionType.INCOME)}
-                className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-all ${type === TransactionType.INCOME ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
+                className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-all ${type === TransactionType.INCOME ? 'bg-[color:var(--app-surface)] dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
               >
                 收入
               </button>
@@ -435,7 +435,7 @@ const AddTransaction: React.FC<Props> = ({ onComplete, autoStartVoice = false })
               </div>
             </div>
 
-            <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-3 bg-slate-50 dark:bg-slate-800">
+            <div className="rounded-xl border border-[color:var(--app-border)] dark:border-slate-700 p-3 bg-[color:var(--app-bg)] dark:bg-slate-800">
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">設為週期性</div>
@@ -444,7 +444,7 @@ const AddTransaction: React.FC<Props> = ({ onComplete, autoStartVoice = false })
                 <label className="inline-flex relative items-center cursor-pointer">
                   <input type="checkbox" checked={isRecurring} onChange={(e) => setIsRecurring(e.target.checked)} className="sr-only" />
                   <div className={`relative w-11 h-6 rounded-full transition-colors ${isRecurring ? 'bg-indigo-600' : 'bg-gray-200'}`}>
-                    <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${isRecurring ? 'translate-x-5' : ''}`}></span>
+                    <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-[color:var(--app-surface)] shadow transition-transform ${isRecurring ? 'translate-x-5' : ''}`}></span>
                   </div>
                 </label>
               </div>
@@ -482,14 +482,14 @@ const AddTransaction: React.FC<Props> = ({ onComplete, autoStartVoice = false })
                       <button
                         type="button"
                         onClick={() => setRunMode('continuous')}
-                        className={`flex-1 px-3 py-2 rounded-lg text-sm border ${runMode === 'continuous' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'}`}
+                        className={`flex-1 px-3 py-2 rounded-lg text-sm border ${runMode === 'continuous' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-[color:var(--app-surface)] dark:bg-slate-800 border-[color:var(--app-border)] dark:border-slate-700 text-slate-600 dark:text-slate-300'}`}
                       >
                         持續
                       </button>
                       <button
                         type="button"
                         onClick={() => setRunMode('limited')}
-                        className={`flex-1 px-3 py-2 rounded-lg text-sm border ${runMode === 'limited' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'}`}
+                        className={`flex-1 px-3 py-2 rounded-lg text-sm border ${runMode === 'limited' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-[color:var(--app-surface)] dark:bg-slate-800 border-[color:var(--app-border)] dark:border-slate-700 text-slate-600 dark:text-slate-300'}`}
                       >
                         指定次數
                       </button>

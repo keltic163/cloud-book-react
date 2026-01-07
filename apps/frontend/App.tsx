@@ -50,7 +50,7 @@ const SyncControl: React.FC = () => {
     <div className="flex items-center gap-2">
       <button
         onClick={() => syncTransactions && syncTransactions(true)}
-        className="flex items-center gap-1 px-3 py-1.5 rounded-md text-xs bg-white dark:bg-slate-700 hover:opacity-90 transition shadow-sm border border-slate-200 dark:border-slate-600"
+        className="flex items-center gap-1 px-3 py-1.5 rounded-md text-xs bg-[color:var(--app-surface)] dark:bg-slate-700 hover:opacity-90 transition shadow-sm border border-[color:var(--app-border)] dark:border-slate-600"
         aria-label={label}
         title={label}
       >
@@ -103,9 +103,9 @@ const Layout = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 pb-24 transition-colors duration-300">
+    <div className="min-h-screen bg-[color:var(--app-bg)] dark:bg-slate-950 text-slate-900 dark:text-slate-100 pb-24 transition-colors duration-300">
       {/* Top Header */}
-      <header className="bg-white dark:bg-slate-900 shadow-sm border-b border-transparent dark:border-slate-800 px-4 py-4 sticky top-0 z-[800] flex justify-between items-center transition-colors">
+      <header className="bg-[color:var(--app-surface)] dark:bg-slate-900 shadow-sm border-b border-transparent dark:border-slate-800 px-4 py-4 sticky top-0 z-[800] flex justify-between items-center transition-colors">
         <div className="flex items-center gap-2">
           <img
             src="/apple-touch-icon.png"
@@ -122,9 +122,9 @@ const Layout = () => {
 
           <button
             onClick={() => setActiveTab('settings')}
-            className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+            className="flex items-center gap-2 bg-[color:var(--app-bg)] dark:bg-slate-800 px-3 py-1.5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
           >
-            <img src={currentUser?.photoURL || 'https://api.dicebear.com/7.x/avataaars/svg?seed=placeholder'} alt={currentUser?.displayName || 'Guest'} className="w-6 h-6 rounded-full bg-white dark:bg-slate-700 object-cover" />
+            <img src={currentUser?.photoURL || 'https://api.dicebear.com/7.x/avataaars/svg?seed=placeholder'} alt={currentUser?.displayName || 'Guest'} className="w-6 h-6 rounded-full bg-[color:var(--app-surface)] dark:bg-slate-700 object-cover" />
             <span className="text-sm font-medium hidden sm:inline dark:text-slate-200">{currentUser?.displayName || '訪客'}</span>
           </button>
         </div>
@@ -141,7 +141,7 @@ const Layout = () => {
       </main>
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 px-2 py-2 flex justify-between items-center z-50 safe-area-bottom max-w-md mx-auto transition-colors">
+      <nav className="fixed bottom-0 left-0 right-0 bg-[color:var(--app-surface)] dark:bg-slate-900 border-t border-[color:var(--app-border)] dark:border-slate-800 px-2 py-2 flex justify-between items-center z-50 safe-area-bottom max-w-md mx-auto transition-colors">
         <button
           onClick={() => setActiveTab('dashboard')}
           className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-colors flex-1 ${activeTab === 'dashboard' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`}
@@ -215,7 +215,7 @@ const AppGate = () => {
 
   if (isInitializing) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-600">
+      <div className="min-h-screen flex items-center justify-center bg-[color:var(--app-bg)] text-slate-600">
         載入中...
       </div>
     );
@@ -237,3 +237,5 @@ const App = () => {
 };
 
 export default App;
+
+

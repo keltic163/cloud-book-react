@@ -33,11 +33,21 @@
     <meta name="apple-mobile-web-app-title" content="CloudLedger" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 
-    <meta name="theme-color" content="#f8fafc">
+    <meta name="theme-color" content="#f5f2eb">
     <style>
+      :root {
+        --app-bg: #f5f2eb;
+        --app-surface: #faf7f1;
+        --app-border: #e2dccf;
+      }
+      html.dark {
+        --app-bg: #020617;
+        --app-surface: #0f172a;
+        --app-border: #1e293b;
+      }
       body {
         font-family: 'Inter', sans-serif;
-        background-color: #f8fafc;
+        background-color: var(--app-bg);
         overscroll-behavior-y: none;
       }
       html.dark body {

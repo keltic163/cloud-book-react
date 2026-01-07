@@ -33,7 +33,7 @@ const TransactionList = () => {
       case '社交': return 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400';
       case '娛樂': return 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400';
       case '教育': return 'bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-400';
-      default: return 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300';
+      default: return 'bg-[color:var(--app-bg)] text-slate-600 dark:bg-slate-700 dark:text-slate-300';
     }
   };
 
@@ -43,7 +43,7 @@ const TransactionList = () => {
   if (transactions.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-        <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4 transition-colors">
+        <div className="w-16 h-16 bg-[color:var(--app-bg)] dark:bg-slate-800 rounded-full flex items-center justify-center mb-4 transition-colors">
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         </div>
         <p>尚無交易紀錄</p>
@@ -66,7 +66,7 @@ const TransactionList = () => {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="搜尋：描述 / 分類 / 金額"
-            className="w-full pl-10 pr-10 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none text-sm text-slate-800 dark:text-slate-100 transition-colors"
+            className="w-full pl-10 pr-10 py-2 rounded-lg border border-[color:var(--app-border)] dark:border-slate-700 bg-[color:var(--app-surface)] dark:bg-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none text-sm text-slate-800 dark:text-slate-100 transition-colors"
             aria-label="搜尋紀錄"
           />
           {search && (
@@ -89,7 +89,7 @@ const TransactionList = () => {
             <div
               key={t.id}
               onClick={() => setEditingId(t.id)}
-              className="group relative bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm flex items-center justify-between gap-3 transition-all hover:shadow-md cursor-pointer hover:border-indigo-200 dark:hover:border-indigo-500/50 active:scale-[0.98]"
+              className="group relative bg-[color:var(--app-surface)] dark:bg-slate-800 p-4 rounded-xl border border-[color:var(--app-border)] dark:border-slate-700 shadow-sm flex items-center justify-between gap-3 transition-all hover:shadow-md cursor-pointer hover:border-indigo-200 dark:hover:border-indigo-500/50 active:scale-[0.98]"
             >
               <div className="flex items-center gap-4 min-w-0">
                 <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold shrink-0 transition-colors ${getCategoryColor(t.category)}`}>
@@ -182,11 +182,11 @@ export const EditTransactionModal = ({
     }
   }, [type, currentCategories, category]);
 
-  const inputClass = 'w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-none';
+  const inputClass = 'w-full border border-[color:var(--app-border)] dark:border-slate-700 rounded-lg px-3 py-2 text-sm bg-[color:var(--app-bg)] dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-none';
 
   return (
     <div className="fixed inset-0 z-[200] bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-[color:var(--app-surface)] dark:bg-slate-900 rounded-2xl w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
         <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">編輯紀錄</h3>
 
         <div className="mt-4 space-y-3">
@@ -241,7 +241,7 @@ export const EditTransactionModal = ({
         </div>
 
         <div className="mt-5 flex gap-2">
-          <button onClick={onClose} className="flex-1 px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm">取消</button>
+          <button onClick={onClose} className="flex-1 px-3 py-2 rounded-lg bg-[color:var(--app-bg)] dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm">取消</button>
           <button
             onClick={() => onSave({ amount: parseFloat(amount), type, category, description, rewards: parseFloat(rewards) || 0, date, targetUserUid })}
             className="flex-1 px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm"
@@ -266,3 +266,5 @@ export const EditTransactionModal = ({
 };
 
 export default TransactionList;
+
+
