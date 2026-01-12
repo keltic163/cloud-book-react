@@ -155,6 +155,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
+  const ensureUserProfileFields = async (uid: string, userData?: Record<string, any>) => {
+    if (!authUser || !db || isMockMode) return;
+    const updates: Record<string, any> = {};
+
+    if (!userData?.displayName && authUser.displayName) updates.displayName = authUser.displayName;
+    if (!userData?.email && authUser.email) updates.email = authUser.email;
+    if (!userData?.photoURL && authUser.photoURL) updates.photoURL = authUser.photoURL;
+    if (!userData?.createdAt) updates.createdAt = Date.now();
+
+    if (Object.keys(updates).length === 0) return;
+    updates.updatedAt = Date.now();
+
+    try {
+      await setDoc(doc(db, 'users', uid), updates, { merge: true });
+    } catch (e) {
+      console.error('Error backfilling user profile:', e);
+    }
+  };
+
   const refreshUserProfile = useCallback(async () => {
     if (!authUser || !db || isMockMode) return;
     try {
@@ -164,6 +183,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const userData = userSnap.data() || {};
         const currentSavedLedgers: SavedLedger[] = (userData as any).savedLedgers || [];
         setSavedLedgers(currentSavedLedgers);
+        void ensureUserProfileFields(authUser.uid, userData as Record<string, any>);
       }
     } catch (e) {
       console.error('Error refreshing user profile:', e);
@@ -235,9 +255,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           targetId = (userData as any).lastLedgerId;
           currentSavedLedgers = (userData as any).savedLedgers || [];
           setSavedLedgers(currentSavedLedgers);
+          void ensureUserProfileFields(authUser.uid, userData as Record<string, any>);
         } else {
           setSavedLedgers([]);
           await syncUserProfile(authUser.uid, { savedLedgers: [] });
+          void ensureUserProfileFields(authUser.uid, {});
         }
 
         if (!targetId && currentSavedLedgers.length > 0) {
