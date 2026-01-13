@@ -4,14 +4,15 @@ import { getFirestore, type Firestore } from "firebase/firestore";
 import { getFunctions, type Functions } from "firebase/functions";
 
 const firebaseConfig = {
-    apiKey: "AIzaSyCqYd0jEalHKO7xH5zvS9_zavr7GA-FyjU",
-    authDomain: "ledger-butler.firebaseapp.com",
-    projectId: "ledger-butler",
-    storageBucket: "ledger-butler.firebasestorage.app",
-    messagingSenderId: "622793086532",
-    appId: "1:622793086532:web:7004d269aadd490616ce11",
-    measurementId: "G-TH05DSNHES"
-  };
+  apiKey: "AIzaSyCqYd0jEalHKO7xH5zvS9_zavr7GA-FyjU",
+  authDomain: "ledger-butler.firebaseapp.com",
+  projectId: "ledger-butler",
+  storageBucket: "ledger-butler.firebasestorage.app",
+  messagingSenderId: "622793086532",
+  appId: "1:622793086532:web:7004d269aadd490616ce11",
+  measurementId: "G-YTMG04WWJR"
+};
+
 
 // 定義變數
 let app;
@@ -21,6 +22,9 @@ let functions: Functions | undefined;
 let googleProvider: GoogleAuthProvider | undefined;
 let isMockMode = false;
 
+
+
+
 try {
   // 1. 嘗試初始化 Firebase (Modular Syntax - Named Import)
   // Use namespace import to avoid TypeScript error 'Module has no exported member initializeApp'
@@ -29,7 +33,6 @@ try {
   db = getFirestore(app);
   functions = getFunctions(app);
   googleProvider = new GoogleAuthProvider();
-  
   console.log("✅ Firebase 連線嘗試成功");
 
 } catch (error) {
