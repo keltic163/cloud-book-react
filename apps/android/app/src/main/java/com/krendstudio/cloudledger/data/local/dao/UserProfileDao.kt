@@ -12,6 +12,9 @@ interface UserProfileDao {
     @Query("SELECT * FROM user_profiles WHERE userUid = :userUid LIMIT 1")
     fun observeProfile(userUid: String): Flow<UserProfileEntity?>
 
+    @Query("SELECT * FROM user_profiles WHERE userUid = :userUid LIMIT 1")
+    suspend fun getProfile(userUid: String): UserProfileEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(profile: UserProfileEntity)
 

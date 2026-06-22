@@ -40,6 +40,15 @@
       ]
     },
     {
+      "target": "portal",
+      "public": "apps/portal",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ]
+    },
+    {
       "target": "admin",
       "public": "apps/admin/dist",
       "ignore": [
@@ -54,5 +63,8 @@
         }
       ]
     }
-  ]
+  ],
+  "firestore": {
+    "indexes": "firestore.indexes.json"
+  }
 }

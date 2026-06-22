@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.activity.compose.BackHandler
 import coil.compose.AsyncImage
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
@@ -49,6 +50,7 @@ import com.krendstudio.cloudledger.model.Transaction
 import com.krendstudio.cloudledger.model.TransactionDraft
 import com.krendstudio.cloudledger.model.TransactionType
 import com.krendstudio.cloudledger.model.LedgerMember
+import com.krendstudio.cloudledger.ui.components.AdBanner
 import com.krendstudio.cloudledger.ui.components.DropdownField
 import com.krendstudio.cloudledger.util.CsvUtils
 import com.krendstudio.cloudledger.viewmodel.AppViewModel
@@ -68,6 +70,7 @@ fun SettingsScreen(viewModel: AppViewModel) {
     val transactions by viewModel.transactions.collectAsState()
     val recurringTemplates by viewModel.recurringTemplates.collectAsState()
     val members by viewModel.members.collectAsState()
+    val isAdFree by viewModel.isAdFree.collectAsState()
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
@@ -116,6 +119,13 @@ fun SettingsScreen(viewModel: AppViewModel) {
     val memberList = remember(members, authState.user) {
         val base = if (members.isNotEmpty()) members else listOfNotNull(fallbackMember)
         base.distinctBy { it.uid }
+    }
+
+    BackHandler(enabled = showCategoryDialog || showChangelogDialog) {
+        when {
+            showCategoryDialog -> showCategoryDialog = false
+            showChangelogDialog -> showChangelogDialog = false
+        }
     }
 
     LaunchedEffect(ledgerState.currentLedgerId) {
@@ -374,6 +384,21 @@ fun SettingsScreen(viewModel: AppViewModel) {
             }
         }
 
+        if (!isAdFree) {
+            item {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    AdBanner(
+                        adUnitId = context.getString(R.string.admob_banner_id),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        }
+
         item {
             SettingsCard(title = "智慧輸入 (AI)", description = "設定 AI 鑰匙與模型。") {
                 OutlinedTextField(
@@ -384,6 +409,18 @@ fun SettingsScreen(viewModel: AppViewModel) {
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(8.dp)
                 )
+                TextButton(
+                    onClick = {
+                        val intent = Intent(Intent.ACTION_VIEW).apply {
+                            data = Uri.parse("https://ai.google.dev/gemini-api/docs/api-key?hl=zh-tw")
+                        }
+                        context.startActivity(intent)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("如何取得 API Key")
+                }
                 Button(
                     onClick = {
                         if (aiKey.isBlank()) return@Button
@@ -391,7 +428,14 @@ fun SettingsScreen(viewModel: AppViewModel) {
                         scope.launch {
                             viewModel.validateAiKey(aiKey)
                                 .onSuccess { validation ->
-                                    aiModels = validation.models
+                                    val geminiModels = validation.models
+                                        .filter { it.contains("gemini", ignoreCase = true) }
+                                        .distinct()
+                                    aiModels = geminiModels
+                                    if (aiModelSelected.isNotBlank() && !geminiModels.contains(aiModelSelected)) {
+                                        aiModelSelected = ""
+                                        prefs.edit().remove("ai_model").apply()
+                                    }
                                     if (validation.valid) {
                                         prefs.edit().putString("ai_key", aiKey).apply()
                                         aiKeyStored = true
@@ -425,17 +469,20 @@ fun SettingsScreen(viewModel: AppViewModel) {
                 ) {
                     Text("移除 API Key")
                 }
-                if (aiModels.isNotEmpty()) {
-                    DropdownField(
-                        "選擇 AI 模型",
-                        aiModels,
-                        aiModelSelected,
-                        { aiModelSelected = it; prefs.edit().putString("ai_model", it).apply() },
-                        Modifier.fillMaxWidth()
-                    )
+                val modelDisplay = when {
+                    aiModelSelected.isNotBlank() -> aiModelSelected
+                    aiModels.isEmpty() -> "請先驗證取得模型"
+                    else -> "請選擇模型"
                 }
+                DropdownField(
+                    "選擇 AI 模型",
+                    aiModels,
+                    modelDisplay,
+                    { aiModelSelected = it; prefs.edit().putString("ai_model", it).apply() },
+                    Modifier.fillMaxWidth()
+                )
                 Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
-                    Text("啟用 AI 功能")
+                    Text("於記帳頁面啟用AI功能")
                     Switch(checked = aiEnabled, onCheckedChange = { aiEnabled = it; prefs.edit().putBoolean("ai_enabled", it).apply() })
                 }
             }
@@ -467,12 +514,25 @@ fun SettingsScreen(viewModel: AppViewModel) {
                     Text("寄信給作者")
                 }
                 Text("Email：chian0163@gmail.com", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+                OutlinedButton(
+                    onClick = {
+                        val intent = Intent(Intent.ACTION_VIEW).apply {
+                            data = Uri.parse(context.getString(R.string.consent_url))
+                        }
+                        context.startActivity(intent)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(context.getString(R.string.consent_settings_label))
+                }
             }
         }
 
         item {
             Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("CloudLedger 雲記 v1.0.0 © 2025 KrendStudio", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("CloudLedger 雲記 v1.0.1 © 2026 KrendStudio", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("     ", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("     ", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -897,10 +957,17 @@ private fun writeCsv(context: Context, uri: Uri, txs: List<Transaction>) {
 private fun readJson(context: Context, uri: Uri): List<TransactionDraft> {
     return try {
         val jsonText = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } ?: return emptyList()
-        val array = JSONObject(jsonText).getJSONArray("transactions")
-        (0 until array.length()).map { i ->
-            val obj = array.getJSONObject(i)
-            TransactionDraft(obj.getDouble("amount"), TransactionType.valueOf(obj.getString("type")), obj.getString("category"), obj.getString("description"), obj.getDouble("rewards"), obj.getString("date"), null)
+        val root = JSONObject(jsonText)
+        val array = root.optJSONArray("transactions") ?: return emptyList()
+        (0 until array.length()).mapNotNull { i ->
+            val obj = array.optJSONObject(i) ?: return@mapNotNull null
+            val amount = (obj.opt("amount") as? Number)?.toDouble() ?: obj.optString("amount").toDoubleOrNull() ?: return@mapNotNull null
+            val rewards = (obj.opt("rewards") as? Number)?.toDouble() ?: obj.optString("rewards").toDoubleOrNull() ?: 0.0
+            val type = parseTransactionType(obj.optString("type"))
+            val category = obj.optString("category")
+            val description = obj.optString("description")
+            val date = obj.optString("date")
+            TransactionDraft(amount, type, category, description, rewards, date, null)
         }
     } catch (e: Exception) { emptyList() }
 }
@@ -908,9 +975,39 @@ private fun readJson(context: Context, uri: Uri): List<TransactionDraft> {
 private fun readCsv(context: Context, uri: Uri): List<TransactionDraft> {
     return try {
         val lines = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readLines() } ?: return emptyList()
+        if (lines.isEmpty()) return emptyList()
+        val headers = CsvUtils.parseLine(lines.first()).mapIndexed { index, value ->
+            if (index == 0) value.removePrefix("\uFEFF").trim() else value.trim()
+        }
+        val indexMap = headers.mapIndexed { idx, header -> header.lowercase() to idx }.toMap()
+        val dateIndex = indexMap["date"]
+        val typeIndex = indexMap["type"]
+        val categoryIndex = indexMap["category"]
+        val amountIndex = indexMap["amount"]
+        val descIndex = indexMap["description"]
+        val rewardsIndex = indexMap["rewards"]
+
         lines.drop(1).mapNotNull { line ->
-            val p = line.split(",")
-            if (p.size < 6) null else TransactionDraft(p[2].toDouble(), TransactionType.valueOf(p[1]), p[3], p[4], p[5].toDouble(), p[0], null)
+            if (line.isBlank()) return@mapNotNull null
+            val fields = CsvUtils.parseLine(line)
+            val amountRaw = amountIndex?.let { fields.getOrNull(it) } ?: return@mapNotNull null
+            val typeRaw = typeIndex?.let { fields.getOrNull(it) } ?: return@mapNotNull null
+            val category = categoryIndex?.let { fields.getOrNull(it) } ?: ""
+            val description = descIndex?.let { fields.getOrNull(it) } ?: ""
+            val rewardsRaw = rewardsIndex?.let { fields.getOrNull(it) } ?: "0"
+            val date = dateIndex?.let { fields.getOrNull(it) } ?: ""
+            val amount = amountRaw.toDoubleOrNull() ?: return@mapNotNull null
+            val rewards = rewardsRaw.toDoubleOrNull() ?: 0.0
+            TransactionDraft(amount, parseTransactionType(typeRaw), category, description, rewards, date, null)
         }
     } catch (e: Exception) { emptyList() }
+}
+
+private fun parseTransactionType(raw: String): TransactionType {
+    val normalized = raw.trim().lowercase()
+    return when (normalized) {
+        "income" -> TransactionType.INCOME
+        "expense" -> TransactionType.EXPENSE
+        else -> runCatching { TransactionType.valueOf(raw) }.getOrDefault(TransactionType.EXPENSE)
+    }
 }

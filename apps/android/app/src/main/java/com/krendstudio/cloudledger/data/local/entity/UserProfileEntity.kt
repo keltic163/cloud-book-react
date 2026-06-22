@@ -6,5 +6,6 @@ import androidx.room.PrimaryKey
 @Entity(tableName = "user_profiles")
 data class UserProfileEntity(
     @PrimaryKey val userUid: String,
-    val lastLedgerId: String?
+    val lastLedgerId: String?,
+    val isAdFree: Boolean = false
 )

@@ -1,4 +1,16 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">CloudLedger</string>
+    <string name="admob_banner_id">ca-app-pub-8673511713655932/7940329414</string>
+    <string name="consent_title">使用者同意與隱私權告知</string>
+    <string name="consent_dialog_title">使用者條款與隱私權政策</string>
+    <string name="consent_accept_label">已閱讀並同意</string>
+    <string name="consent_decline_label">不同意並關閉</string>
+    <string name="consent_settings_label">使用者條款與隱私權政策</string>
+    <string name="consent_url">https://krendstudio-portal.web.app/</string>
+    <string name="consent_terms_url">https://krendstudio-portal.web.app/terms/</string>
+    <string name="consent_privacy_url">https://krendstudio-portal.web.app/privacy/</string>
+    <string name="consent_prompt">請勾選以下選項表示同意《使用者條款》與《隱私權政策》（不需開啟連結）。</string>
+    <string name="consent_terms_label">使用者條款</string>
+    <string name="consent_privacy_label">隱私權政策</string>
 </resources>

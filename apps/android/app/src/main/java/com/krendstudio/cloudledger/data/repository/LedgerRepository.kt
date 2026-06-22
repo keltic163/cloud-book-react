@@ -53,7 +53,8 @@ class LedgerRepository(
             profileEntity?.toModel(saved) ?: UserProfile(
                 uid = userUid,
                 lastLedgerId = null,
-                savedLedgers = saved
+                savedLedgers = saved,
+                isAdFree = false
             )
         }
     }
@@ -198,17 +199,27 @@ class LedgerRepository(
 
     suspend fun refreshUserProfile(user: AppUser): Result<UserProfile> {
         return runCatching {
-            val doc = firestore.collection("users").document(user.uid).get().await()
+            val docRef = firestore.collection("users").document(user.uid)
+            val doc = docRef.get().await()
             val savedLedgers = parseSavedLedgers(doc.get("savedLedgers"))
             val lastLedgerId = doc.getString("lastLedgerId")
+            val isAdFree = doc.getBoolean("isAdFree")
+                ?: doc.getBoolean("adFree")
+                ?: doc.getBoolean("vip")
+                ?: false
 
-            updateLocalProfile(user.uid, lastLedgerId, savedLedgers)
+            updateLocalProfile(user.uid, lastLedgerId, savedLedgers, isAdFree)
 
             if (!doc.exists()) {
-                updateUserProfileRemote(user.uid, lastLedgerId, savedLedgers)
+                updateUserProfileRemote(user.uid, lastLedgerId, savedLedgers, user)
+            } else {
+                val patch = buildUserProfilePatchIfMissing(user, doc.data ?: emptyMap())
+                if (patch.isNotEmpty()) {
+                    docRef.set(patch, SetOptions.merge()).await()
+                }
             }
 
-            UserProfile(user.uid, lastLedgerId, savedLedgers)
+            UserProfile(user.uid, lastLedgerId, savedLedgers, isAdFree)
         }
     }
 
@@ -238,7 +249,7 @@ class LedgerRepository(
             val newList = saved.filter { it.id != entry.id } + entry
 
             updateLocalProfile(user.uid, entry.id, newList)
-            updateUserProfileRemote(user.uid, entry.id, newList)
+            updateUserProfileRemote(user.uid, entry.id, newList, user)
             entry
         }
     }
@@ -261,7 +272,7 @@ class LedgerRepository(
             val newList = saved.filter { it.id != ledgerId } + entry
 
             updateLocalProfile(user.uid, ledgerId, newList)
-            updateUserProfileRemote(user.uid, ledgerId, newList)
+            updateUserProfileRemote(user.uid, ledgerId, newList, user)
             entry
         }
     }
@@ -273,7 +284,7 @@ class LedgerRepository(
                 if (it.id == ledgerId) it.copy(lastAccessedAt = System.currentTimeMillis()) else it
             }
             updateLocalProfile(user.uid, ledgerId, updated)
-            updateUserProfileRemote(user.uid, ledgerId, updated)
+            updateUserProfileRemote(user.uid, ledgerId, updated, user)
         }
     }
 
@@ -292,7 +303,7 @@ class LedgerRepository(
             }
 
             updateLocalProfile(user.uid, nextLedgerId, updated)
-            updateUserProfileRemote(user.uid, nextLedgerId, updated)
+            updateUserProfileRemote(user.uid, nextLedgerId, updated, user)
             nextLedgerId
         }
     }
@@ -329,6 +340,38 @@ class LedgerRepository(
                 .collection("transactions")
                 .add(payload)
                 .await()
+        }
+    }
+
+    suspend fun addLocalTransaction(
+        ledgerId: String,
+        user: AppUser,
+        amount: Double,
+        type: TransactionType,
+        category: String,
+        description: String,
+        rewards: Double,
+        date: String,
+        targetUserUid: String?
+    ): Result<Unit> {
+        return runCatching {
+            val now = System.currentTimeMillis()
+            val tx = Transaction(
+                id = "local-$now",
+                amount = amount,
+                type = type,
+                category = category,
+                description = description,
+                rewards = rewards,
+                date = date,
+                creatorUid = user.uid,
+                targetUserUid = targetUserUid,
+                ledgerId = ledgerId,
+                createdAt = now,
+                updatedAt = now,
+                deleted = false
+            )
+            transactionDao.upsertAll(listOf(tx.toEntity()))
         }
     }
 
@@ -407,7 +450,7 @@ class LedgerRepository(
         note: String?,
         intervalMonths: Int,
         executeDay: Int,
-        nextRunAt: Long,
+        baseDate: String,
         totalRuns: Int?,
         remainingRuns: Int?
     ): Result<Unit> {
@@ -423,7 +466,7 @@ class LedgerRepository(
                 "note" to note,
                 "intervalMonths" to intervalMonths,
                 "executeDay" to executeDay,
-                "nextRunAt" to java.util.Date(nextRunAt),
+                "baseDate" to baseDate,
                 "isActive" to true,
                 "createdAt" to now,
                 "updatedAt" to now
@@ -484,16 +527,19 @@ class LedgerRepository(
                 if (ledger.id == ledgerId) ledger.copy(alias = safeAlias) else ledger
             }
             updateLocalProfile(userUid, lastLedgerId, updated)
-            updateUserProfileRemote(userUid, lastLedgerId, updated)
+            updateUserProfileRemote(userUid, lastLedgerId, updated, null)
         }
     }
 
     suspend fun updateLocalProfile(
         userUid: String,
         lastLedgerId: String?,
-        savedLedgers: List<SavedLedger>
+        savedLedgers: List<SavedLedger>,
+        isAdFree: Boolean? = null
     ) {
-        userProfileDao.upsert(UserProfile(userUid, lastLedgerId, savedLedgers).toEntity())
+        val existing = if (isAdFree == null) userProfileDao.getProfile(userUid) else null
+        val resolvedAdFree = isAdFree ?: existing?.isAdFree ?: false
+        userProfileDao.upsert(UserProfile(userUid, lastLedgerId, savedLedgers, resolvedAdFree).toEntity())
         savedLedgerDao.clearForUser(userUid)
         if (savedLedgers.isNotEmpty()) {
             savedLedgerDao.upsertAll(savedLedgers.map { it.toEntity(userUid) })
@@ -508,9 +554,10 @@ class LedgerRepository(
     private suspend fun updateUserProfileRemote(
         uid: String,
         lastLedgerId: String?,
-        savedLedgers: List<SavedLedger>
+        savedLedgers: List<SavedLedger>,
+        user: AppUser? = null
     ) {
-        val payload = mapOf(
+        val payload = mutableMapOf(
             "lastLedgerId" to lastLedgerId,
             "savedLedgers" to savedLedgers.map { ledger ->
                 mapOf(
@@ -520,9 +567,39 @@ class LedgerRepository(
                 )
             }
         )
+        if (user != null) {
+            payload["displayName"] = user.displayName
+            payload["email"] = user.email
+            payload["photoURL"] = user.photoUrl
+            payload["updatedAt"] = System.currentTimeMillis()
+            payload["createdAt"] = System.currentTimeMillis()
+        }
         firestore.collection("users").document(uid)
             .set(payload, SetOptions.merge())
             .await()
+    }
+
+    private fun buildUserProfilePatchIfMissing(
+        user: AppUser,
+        data: Map<String, Any>
+    ): Map<String, Any> {
+        val patch = mutableMapOf<String, Any>()
+        if ((data["displayName"] as? String).isNullOrBlank()) {
+            patch["displayName"] = user.displayName
+        }
+        if ((data["email"] as? String).isNullOrBlank() && !user.email.isNullOrBlank()) {
+            patch["email"] = user.email
+        }
+        if ((data["photoURL"] as? String).isNullOrBlank() && !user.photoUrl.isNullOrBlank()) {
+            patch["photoURL"] = user.photoUrl
+        }
+        if (data["createdAt"] == null) {
+            patch["createdAt"] = System.currentTimeMillis()
+        }
+        if (patch.isNotEmpty()) {
+            patch["updatedAt"] = System.currentTimeMillis()
+        }
+        return patch
     }
 
     private fun parseSavedLedgers(raw: Any?): List<SavedLedger> {

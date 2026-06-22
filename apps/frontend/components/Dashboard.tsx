@@ -3,6 +3,7 @@ import { useAppContext } from '../contexts/AppContext';
 import { TransactionType } from '../types';
 import { EditTransactionModal } from './TransactionList';
 import SystemAnnouncement from './SystemAnnouncement';
+import { getTaipeiTimestamp, toDateKey } from '../utils/date';
 
 const SparklesIcon = ({ className }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
@@ -48,11 +49,13 @@ const Dashboard = () => {
     let income = 0;
     let expense = 0;
     const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
+    const month = currentDate.getMonth() + 1;
 
     transactions.forEach(t => {
-      const tDate = new Date(t.date);
-      if (tDate.getFullYear() === year && tDate.getMonth() === month) {
+      const key = toDateKey(t.date);
+      if (!key) return;
+      const [y, m] = key.split('-').map(Number);
+      if (y === year && m === month) {
         if (t.type === TransactionType.INCOME) income += t.amount;
         if (t.type === TransactionType.EXPENSE) expense += t.amount;
       }
@@ -65,7 +68,7 @@ const Dashboard = () => {
   // 這裡使用 currentDate，所以當你切換月份時，本月回饋也會跟著變
   const rewardStats = useMemo(() => {
     const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
+    const month = currentDate.getMonth() + 1;
 
     let monthRewards = 0;
     let totalRewards = 0;
@@ -77,8 +80,10 @@ const Dashboard = () => {
         totalRewards += reward;
 
         // 2. 檢查是否為當前檢視的月份
-        const tDate = new Date(t.date);
-        if (tDate.getFullYear() === year && tDate.getMonth() === month) {
+        const key = toDateKey(t.date);
+        if (!key) return;
+        const [y, m] = key.split('-').map(Number);
+        if (y === year && m === month) {
           monthRewards += reward;
         }
       }
@@ -90,7 +95,7 @@ const Dashboard = () => {
   // Calendar Logic
   const calendarData = useMemo(() => {
     const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
+    const month = currentDate.getMonth() + 1;
     
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const firstDayOfWeek = new Date(year, month, 1).getDay(); // 0 = Sunday
@@ -99,9 +104,11 @@ const Dashboard = () => {
     const dailyStats: Record<string, { income: number, expense: number }> = {};
     
     transactions.forEach(t => {
-      const tDate = new Date(t.date);
-      if (tDate.getFullYear() === year && tDate.getMonth() === month) {
-        const dayKey = tDate.getDate().toString();
+      const key = toDateKey(t.date);
+      if (!key) return;
+      const [y, m, d] = key.split('-').map(Number);
+      if (y === year && m === month) {
+        const dayKey = String(d);
         if (!dailyStats[dayKey]) dailyStats[dayKey] = { income: 0, expense: 0 };
         
         if (t.type === TransactionType.INCOME) dailyStats[dayKey].income += t.amount;
@@ -129,11 +136,13 @@ const Dashboard = () => {
   const selectedDayTransactions = useMemo(() => {
     if (!selectedDay) return [];
     const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
+    const month = currentDate.getMonth() + 1;
     return transactions.filter(t => {
-        const d = new Date(t.date);
-        return d.getFullYear() === year && d.getMonth() === month && d.getDate() === selectedDay;
-    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        const key = toDateKey(t.date);
+        if (!key) return false;
+        const [y, m, d] = key.split('-').map(Number);
+        return y === year && m === month && d === selectedDay;
+    }).sort((a, b) => getTaipeiTimestamp(b.date) - getTaipeiTimestamp(a.date));
   }, [selectedDay, currentDate, transactions]);
 
   const changeMonth = (offset: number) => {

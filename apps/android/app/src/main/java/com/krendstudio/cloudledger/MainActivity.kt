@@ -7,6 +7,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.ads.MobileAds
 import com.google.firebase.auth.FirebaseAuth
 import com.krendstudio.cloudledger.data.local.AppDatabase
 import com.krendstudio.cloudledger.data.repository.LedgerRepository
@@ -31,6 +32,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         
         CrashReporter.init(applicationContext)
+        MobileAds.initialize(this)
         if (CrashReporter.hasCrashLog(applicationContext)) {
             startActivity(android.content.Intent(this, CrashLogActivity::class.java))
             finish()

@@ -31,10 +31,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
 import coil.compose.AsyncImage
+import com.krendstudio.cloudledger.R
 import com.krendstudio.cloudledger.model.LedgerMember
 import com.krendstudio.cloudledger.model.Transaction
 import com.krendstudio.cloudledger.model.TransactionType
+import com.krendstudio.cloudledger.ui.components.AdBanner
 import com.krendstudio.cloudledger.util.DateUtils
 import com.krendstudio.cloudledger.util.formatNumber
 import com.krendstudio.cloudledger.viewmodel.AppViewModel
@@ -52,6 +55,7 @@ fun StatsScreen(viewModel: AppViewModel) {
     val incomeCategories by viewModel.incomeCategories.collectAsState()
     val members by viewModel.members.collectAsState()
     val authState by viewModel.authState.collectAsState()
+    val isAdFree by viewModel.isAdFree.collectAsState()
 
     var timeRange by remember { mutableStateOf(TimeRange.MONTH) }
     var currentMonth by remember { mutableStateOf(YearMonth.now()) }
@@ -227,6 +231,20 @@ fun StatsScreen(viewModel: AppViewModel) {
             StatCard("總收入 (含回饋)", totalIncome, Color(0xFF10B981), modifier = Modifier.weight(1f))
             StatCard("總支出", totalExpense, Color(0xFFE11D48), modifier = Modifier.weight(1f))
             StatCard("本月結餘", totalIncome - totalExpense, Color(0xFF3B82F6), modifier = Modifier.weight(1f))
+        }
+
+        if (!isAdFree) {
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                color = MaterialTheme.colorScheme.surface,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                AdBanner(
+                    adUnitId = stringResource(id = R.string.admob_banner_id),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
 
         // 3. 趨勢圖表

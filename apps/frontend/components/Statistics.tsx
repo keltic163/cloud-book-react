@@ -1,6 +1,7 @@
 ﻿import React, { useMemo, useState } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { TransactionType } from '../types';
+import { toDateKey } from '../utils/date';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -38,7 +39,7 @@ const Statistics = () => {
   // --- 核心計算邏輯 ---
   const stats = useMemo(() => {
     const year = currentDate.getFullYear();
-    const month = currentDate.getMonth(); 
+    const month = currentDate.getMonth() + 1; 
 
     // 1. 第一層篩選：全域過濾 (成員、關鍵字、分類)
     // 這些篩選會同時影響「年度趨勢」和「詳細圖表」
@@ -63,21 +64,23 @@ const Statistics = () => {
     let yearTotalExpense = 0;
 
     filteredTransactions.forEach(t => {
-      const tDate = new Date(t.date);
-      if (tDate.getFullYear() === year) {
-        const m = tDate.getMonth();
+      const key = toDateKey(t.date);
+      if (!key) return;
+      const [y, m] = key.split('-').map(Number);
+      if (y === year) {
+        const mIndex = m - 1;
         
         if (t.type === TransactionType.EXPENSE) {
-          yearlyData[m].expense += t.amount;
+          yearlyData[mIndex].expense += t.amount;
           yearTotalExpense += t.amount;
         } 
         if (t.type === TransactionType.INCOME) {
-          yearlyData[m].income += t.amount;
+          yearlyData[mIndex].income += t.amount;
           yearTotalIncome += t.amount;
         }
         // 回饋金計入收入
         if (t.rewards && t.rewards > 0) {
-          yearlyData[m].income += t.rewards;
+          yearlyData[mIndex].income += t.rewards;
           yearTotalIncome += t.rewards;
         }
       }
@@ -85,12 +88,13 @@ const Statistics = () => {
 
     // 3. 準備「本月/本年」顯示用的詳細數據
     const activeTransactions = filteredTransactions.filter(t => {
-      const tDate = new Date(t.date);
+      const key = toDateKey(t.date);
+      if (!key) return false;
+      const [y, m] = key.split('-').map(Number);
       if (timeRange === 'month') {
-        return tDate.getFullYear() === year && tDate.getMonth() === month;
-      } else {
-        return tDate.getFullYear() === year;
+        return y === year && m === month;
       }
+      return y === year;
     });
 
     // 計算顯示用的總金額

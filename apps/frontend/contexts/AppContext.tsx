@@ -1,6 +1,7 @@
 ﻿import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { Transaction, User, SavedLedger } from '../types';
 import { DEFAULT_EXPENSE_CATEGORIES, DEFAULT_INCOME_CATEGORIES } from '../constants';
+import { getTaipeiTimestamp } from '../utils/date';
 import { useAuth } from './AuthContext';
 import { db, functions, isMockMode } from '../firebase';
 import {
@@ -39,7 +40,7 @@ interface AppContextType {
     note?: string;
     intervalMonths: number;
     executeDay: number;
-    nextRunAt: Date;
+    baseDate: string;
     totalRuns?: number;
     remainingRuns?: number;
   }) => Promise<void>;
@@ -368,7 +369,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
       });
       // return sorted by date desc
-      const merged = Array.from(map.values()).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      const merged = Array.from(map.values()).sort((a, b) => getTaipeiTimestamp(b.date) - getTaipeiTimestamp(a.date));
       localStorage.setItem(MOCK_STORAGE_KEY_TXS, JSON.stringify(merged));
       return merged;
     });
@@ -569,7 +570,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     note?: string;
     intervalMonths: number;
     executeDay: number;
-    nextRunAt: Date;
+    baseDate: string;
     totalRuns?: number;
     remainingRuns?: number;
   }) => {
@@ -586,7 +587,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         frequency: 'monthly',
         intervalMonths: data.intervalMonths,
         executeDay: data.executeDay,
-        nextRunAt: data.nextRunAt,
+        baseDate: data.baseDate,
         isActive: true,
         createdAt: Date.now(),
         updatedAt: Date.now()

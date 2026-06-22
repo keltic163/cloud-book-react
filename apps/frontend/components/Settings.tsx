@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { validateApiKey } from '../services/geminiService';
 import { db } from '../firebase';
 import { collection, deleteDoc, doc, getDocs, query, updateDoc, where } from 'firebase/firestore';
+import { formatTaipeiDate, toDateKey } from '../utils/date';
 
 // --- Icons ---
 const DownloadIcon = ({ className }: { className?: string }) => (
@@ -459,7 +460,7 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
     URL.revokeObjectURL(url);
   };
 
-  const getDateStr = () => new Date().toISOString().split('T')[0];
+  const getDateStr = () => toDateKey(new Date());
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -485,8 +486,9 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
 
   const formatRecurringDate = (value: any) => {
     if (!value) return '—';
-    const date = value.toDate ? value.toDate() : new Date(value);
-    return date.toLocaleDateString('zh-TW');
+    const dateValue = value.toDate ? value.toDate() : value;
+    const formatted = formatTaipeiDate(dateValue);
+    return formatted || '—';
   };
 
   const addMonthsWithDay = (base: Date, months: number, day: number) => {
@@ -1014,7 +1016,7 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
       </SectionCard>
 
       <div className="text-center text-xs text-slate-400 py-4">
-        CloudLedger 雲記 v3.5.3 © 2025 KrendStudio
+        CloudLedger 雲記 v3.5.3 © 2026 KrendStudio
       </div>
 
       {showLedgerSwitcher && (

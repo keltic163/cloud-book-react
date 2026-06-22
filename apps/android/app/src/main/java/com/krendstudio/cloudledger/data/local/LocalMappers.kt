@@ -36,14 +36,16 @@ fun UserProfileEntity.toModel(savedLedgers: List<SavedLedger>): UserProfile {
     return UserProfile(
         uid = userUid,
         lastLedgerId = lastLedgerId,
-        savedLedgers = savedLedgers
+        savedLedgers = savedLedgers,
+        isAdFree = isAdFree
     )
 }
 
 fun UserProfile.toEntity(): UserProfileEntity {
     return UserProfileEntity(
         userUid = uid,
-        lastLedgerId = lastLedgerId
+        lastLedgerId = lastLedgerId,
+        isAdFree = isAdFree
     )
 }
 

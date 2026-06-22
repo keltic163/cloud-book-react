@@ -26,7 +26,7 @@ import com.krendstudio.cloudledger.data.local.entity.UserProfileEntity
         RecurringTemplateEntity::class,
         SyncStateEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

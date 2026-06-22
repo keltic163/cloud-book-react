@@ -8,6 +8,9 @@
         "app": [
           "cloudledger"
         ],
+        "portal": [
+          "krendstudio-portal"
+        ],
         "admin": [
           "cloudledger-admin"
         ]

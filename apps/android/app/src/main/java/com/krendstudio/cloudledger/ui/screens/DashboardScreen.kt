@@ -1,13 +1,19 @@
 ﻿package com.krendstudio.cloudledger.ui.screens
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.MarqueeAnimationMode
+import androidx.compose.foundation.MarqueeSpacing
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.draggable
-import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
@@ -21,6 +27,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -32,17 +39,26 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.activity.compose.BackHandler
 import coil.compose.AsyncImage
+import com.krendstudio.cloudledger.R
 import com.krendstudio.cloudledger.model.LedgerMember
 import com.krendstudio.cloudledger.model.Transaction
 import com.krendstudio.cloudledger.model.TransactionType
 import com.krendstudio.cloudledger.ui.components.DropdownField
+import com.krendstudio.cloudledger.ui.components.AdBanner
 import com.krendstudio.cloudledger.util.DateUtils
 import com.krendstudio.cloudledger.util.formatNumber
 import com.krendstudio.cloudledger.util.formatPlainNumber
 import com.krendstudio.cloudledger.viewmodel.AppViewModel
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import kotlinx.coroutines.flow.collectLatest
+import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.YearMonth
@@ -61,26 +77,16 @@ fun DashboardScreen(viewModel: AppViewModel) {
     val authState by viewModel.authState.collectAsState()
     val selectedDate by viewModel.selectedDate.collectAsState()
     val announcement by viewModel.announcement.collectAsState()
+    val isAdFree by viewModel.isAdFree.collectAsState()
     
     var currentMonth by remember { mutableStateOf(YearMonth.now()) }
-    var selectedDayTransactions by remember { mutableStateOf<LocalDate?>(null) }
-    var editingTransaction by remember { mutableStateOf<Transaction?>(null) }
+    var calendarMonth by remember { mutableStateOf(currentMonth) }
+    var showMonthPicker by remember { mutableStateOf(false) }
+    val calendarOffset = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
-    val navInsetDp = 0.dp
-    val sheetHalfRatio = 0.55f
-    val sheetFullRatio = 0.9f
-    var sheetHeightPx by remember { mutableStateOf(0f) }
-
-    LaunchedEffect(selectedDayTransactions) {
-        viewModel.setDaySheetOpen(selectedDayTransactions != null)
-        if (selectedDayTransactions != null) {
-            sheetHeightPx = 0f
-        }
-    }
-
-    DisposableEffect(Unit) {
-        onDispose { viewModel.setDaySheetOpen(false) }
+    BackHandler(enabled = showMonthPicker) {
+        showMonthPicker = false
     }
 
     val fallbackMember = authState.user?.let {
@@ -91,7 +97,7 @@ fun DashboardScreen(viewModel: AppViewModel) {
 
     val monthTransactions = transactions.filter { transaction ->
         val date = DateUtils.parseLocalDate(transaction.date)
-        date != null && YearMonth.from(date) == currentMonth
+        date != null && YearMonth.from(date) == calendarMonth
     }
 
     val monthlyIncome = monthTransactions
@@ -116,16 +122,43 @@ fun DashboardScreen(viewModel: AppViewModel) {
         monthRewards to totalRewards
     }
 
+    @Suppress("UnusedBoxWithConstraintsScope")
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val maxHeightPx = with(density) { maxHeight.toPx() }
-        val navInsetPx = with(density) { navInsetDp.toPx() }
-        val minHeightPx = maxHeightPx * sheetHalfRatio
-        val maxSheetPx = maxHeightPx * sheetFullRatio
-        val sheetHeight = sheetHeightPx.takeIf { it > 0f } ?: minHeightPx
-        val sheetOffset = (maxHeightPx - sheetHeight - navInsetPx).coerceAtLeast(0f)
-        val draggableState = rememberDraggableState { delta ->
-            val next = (sheetHeightPx - delta).coerceIn(minHeightPx, maxSheetPx)
-            sheetHeightPx = next
+        val calendarWidthPx = with(density) { maxWidth.toPx() }
+        val navBarHeight = 64.dp
+        val calendarThreshold = calendarWidthPx * 0.2f
+
+        fun animateCalendarMonthChange(deltaMonths: Int) {
+            scope.launch {
+                val direction = if (deltaMonths < 0) 1f else -1f
+                calendarOffset.animateTo(
+                    targetValue = calendarWidthPx * direction,
+                    animationSpec = tween(durationMillis = 360)
+                )
+                calendarMonth = calendarMonth.plusMonths(deltaMonths.toLong())
+                currentMonth = calendarMonth
+                calendarOffset.snapTo(calendarWidthPx * -direction)
+                calendarOffset.animateTo(
+                    targetValue = 0f,
+                    animationSpec = tween(durationMillis = 360)
+                )
+            }
+        }
+
+        fun animateCalendarToMonth(target: YearMonth) {
+            val delta = target.monthValue - calendarMonth.monthValue + (target.year - calendarMonth.year) * 12
+            if (delta != 0) {
+                animateCalendarMonthChange(delta)
+            } else {
+                calendarMonth = target
+                currentMonth = target
+            }
+        }
+
+        fun handleAssetMonthChange(target: YearMonth) {
+            currentMonth = target
+            animateCalendarToMonth(target)
         }
 
         Column(
@@ -146,111 +179,99 @@ fun DashboardScreen(viewModel: AppViewModel) {
                 color = MaterialTheme.colorScheme.surface,
                 border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
-                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    CalendarHeader(currentMonth) { currentMonth = it }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .offset { IntOffset(calendarOffset.value.roundToInt(), 0) }
+                        .pointerInput(currentMonth, calendarWidthPx) {
+                            detectHorizontalDragGestures(
+                                onHorizontalDrag = { _, dragAmount ->
+                                    scope.launch {
+                                        calendarOffset.snapTo(calendarOffset.value + dragAmount)
+                                    }
+                                },
+                                onDragEnd = {
+                                    val currentOffset = calendarOffset.value
+                                    when {
+                                        currentOffset > calendarThreshold -> animateCalendarMonthChange(-1)
+                                        currentOffset < -calendarThreshold -> animateCalendarMonthChange(1)
+                                        else -> scope.launch {
+                                            calendarOffset.animateTo(
+                                                targetValue = 0f,
+                                                animationSpec = tween(durationMillis = 260)
+                                            )
+                                        }
+                                    }
+                                },
+                                onDragCancel = {
+                                    scope.launch {
+                                        calendarOffset.animateTo(
+                                            targetValue = 0f,
+                                            animationSpec = tween(durationMillis = 260)
+                                        )
+                                    }
+                                }
+                            )
+                        }
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                    CalendarHeader(
+                        currentMonth = calendarMonth,
+                        onMonthChange = { target -> animateCalendarToMonth(target) },
+                        onOpenPicker = { showMonthPicker = true },
+                        onPrevClick = { animateCalendarMonthChange(-1) },
+                        onNextClick = { animateCalendarMonthChange(1) }
+                    )
                     CalendarWeekdayLabels()
                     CalendarGrid(
-                        yearMonth = currentMonth,
+                        yearMonth = calendarMonth,
                         selectedDate = selectedDate,
                         dailyTotals = dailyTotals,
                         onSelect = { day ->
-                            viewModel.setSelectedDate(day)
-                            selectedDayTransactions = day
-                            sheetHeightPx = minHeightPx
-                        }
-                    )
+                                viewModel.setSelectedDate(day)
+                                viewModel.setDaySheetOpen(true)
+                            }
+                        )
+                    }
                 }
             }
 
-            AssetChangeCard(currentMonth, monthlyIncome, monthlyExpense) { currentMonth = it }
+            AssetChangeCard(
+                currentMonth = currentMonth,
+                inc = monthlyIncome,
+                exp = monthlyExpense,
+                onMonthChange = { target -> handleAssetMonthChange(target) }
+            )
+            if (!isAdFree) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    AdBanner(
+                        adUnitId = stringResource(id = R.string.admob_banner_id),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
             PointRewardCard(rewardStats.first, rewardStats.second)
             Spacer(modifier = Modifier.height(4.dp))
         }
 
-        selectedDayTransactions?.let { date ->
-            val dayTxs = transactions.filter { DateUtils.parseLocalDate(it.date) == date }
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clickable {
-                        selectedDayTransactions = null
-                        viewModel.setSelectedDate(LocalDate.now())
-                    }
-            )
-            Surface(
-                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-                color = MaterialTheme.colorScheme.surface,
-                modifier = Modifier
-                    .offset { IntOffset(0, sheetOffset.roundToInt()) }
-                    .fillMaxWidth()
-                    .height(with(density) { sheetHeight.toDp() })
-                    .draggable(
-                        orientation = Orientation.Vertical,
-                        state = draggableState,
-                        onDragStopped = {
-                            val mid = (minHeightPx + maxSheetPx) / 2f
-                            sheetHeightPx = if (sheetHeightPx >= mid) maxSheetPx else minHeightPx
-                        }
-                    )
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(bottom = 24.dp, start = 16.dp, end = 16.dp, top = 12.dp)
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    BottomSheetDefaults.DragHandle()
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Column {
-                            Text("${date.monthValue}月${date.dayOfMonth}日 交易", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                            Text("${dayTxs.size} 筆交易", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        IconButton(onClick = {
-                            selectedDayTransactions = null
-                            viewModel.setSelectedDate(LocalDate.now())
-                        }) { Icon(Icons.Outlined.Close, null) }
-                    }
-                    
-                    if (dayTxs.isEmpty()) {
-                        Text("當日無紀錄", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 20.dp))
-                    } else {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            dayTxs.forEach { tx ->
-                                DashboardTransactionRow(
-                                    transaction = tx,
-                                    member = membersById[tx.targetUserUid ?: tx.creatorUid],
-                                    onClick = {
-                                        selectedDayTransactions = null
-                                        editingTransaction = tx
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
     }
 
-    editingTransaction?.let { tx ->
-        EditTransactionDialog(
-            transaction = tx,
-            expenseCategories = expenseCategories,
-            incomeCategories = incomeCategories,
-            members = availableMembers,
-            onDismiss = { editingTransaction = null },
-            onSave = { updates ->
-                updates?.let { payload ->
-                    scope.launch {
-                        viewModel.updateTransaction(tx.id, payload, tx.updatedAt ?: tx.createdAt)
-                        editingTransaction = null
-                    }
-                } ?: run { editingTransaction = null }
-            },
-            onDelete = {
-                editingTransaction = null
-                scope.launch { viewModel.deleteTransaction(tx.id) }
+    if (showMonthPicker) {
+        MonthPickerDialog(
+            currentMonth = calendarMonth,
+            onDismiss = { showMonthPicker = false },
+            onConfirm = { selected ->
+                calendarMonth = selected
+                currentMonth = selected
+                showMonthPicker = false
             }
         )
     }
@@ -367,16 +388,70 @@ private fun AssetChangeCard(currentMonth: YearMonth, inc: Double, exp: Double, o
     }
     val textColor = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface
 
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    val assetOffset = remember { Animatable(0f) }
+
     Surface(shape = RoundedCornerShape(8.dp), color = Color.Transparent, shadowElevation = 4.dp) {
-        Box(modifier = Modifier.fillMaxWidth().background(brush, shape = RoundedCornerShape(8.dp)).padding(20.dp)) {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(modifier = Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
-                    Text("${currentMonth.monthValue}月資產變化", color = if (isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.primary)
-                    Row {
-                        IconButton(onClick = { onMonthChange(currentMonth.minusMonths(1)) }, Modifier.size(24.dp)) { Text("<", color = if (isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.primary) }
-                        IconButton(onClick = { onMonthChange(currentMonth.plusMonths(1)) }, Modifier.size(24.dp)) { Text(">", color = if (isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.primary) }
-                    }
+        @Suppress("UnusedBoxWithConstraintsScope")
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(brush, shape = RoundedCornerShape(8.dp))
+                .padding(horizontal = 8.dp, vertical = 20.dp)
+        ) {
+            val assetWidthPx = with(density) { maxWidth.toPx() }
+
+            fun animateMonthChange(deltaMonths: Int) {
+                scope.launch {
+                    val direction = if (deltaMonths < 0) 1f else -1f
+                    assetOffset.animateTo(
+                        targetValue = assetWidthPx * direction,
+                        animationSpec = tween(durationMillis = 360)
+                    )
+                    onMonthChange(currentMonth.plusMonths(deltaMonths.toLong()))
+                    assetOffset.snapTo(assetWidthPx * -direction)
+                    assetOffset.animateTo(
+                        targetValue = 0f,
+                        animationSpec = tween(durationMillis = 360)
+                    )
                 }
+            }
+
+            IconButton(
+                onClick = { animateMonthChange(-1) },
+                modifier = Modifier.align(Alignment.TopStart)
+            ) {
+                Text("<", color = if (isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.primary)
+            }
+            IconButton(
+                onClick = { animateMonthChange(1) },
+                modifier = Modifier.align(Alignment.TopEnd)
+            ) {
+                Text(">", color = if (isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.primary)
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .align(Alignment.TopCenter)
+            ) {
+                Text(
+                    "${currentMonth.monthValue}月資產變化",
+                    textAlign = TextAlign.Center,
+                    color = if (isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.align(Alignment.Center)
+                )
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 28.dp, end = 28.dp, top = 36.dp)
+                    .offset { IntOffset(assetOffset.value.roundToInt(), 0) },
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 Text("${if (inc - exp >= 0) "+" else ""}${formatNumber(inc - exp)}", color = if (inc - exp >= 0) Color(0xFF10B981) else Color(0xFFE11D48), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                 Row(Modifier.fillMaxWidth().padding(top = 8.dp), Arrangement.SpaceBetween) {
                     Column {
@@ -394,14 +469,160 @@ private fun AssetChangeCard(currentMonth: YearMonth, inc: Double, exp: Double, o
 }
 
 @Composable
-private fun CalendarHeader(currentMonth: YearMonth, onMonthChange: (YearMonth) -> Unit) {
+private fun CalendarHeader(
+    currentMonth: YearMonth,
+    onMonthChange: (YearMonth) -> Unit,
+    onOpenPicker: () -> Unit,
+    onPrevClick: () -> Unit,
+    onNextClick: () -> Unit
+) {
     Row(modifier = Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
         Text("收支日曆", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)).padding(horizontal = 4.dp, vertical = 2.dp)) {
-            IconButton(onClick = { onMonthChange(currentMonth.minusMonths(1)) }, Modifier.size(32.dp)) { Text("<", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
+                .clickable { onOpenPicker() }
+                .padding(horizontal = 4.dp, vertical = 2.dp)
+        ) {
+            IconButton(onClick = onPrevClick, Modifier.size(32.dp)) { Text("<", color = MaterialTheme.colorScheme.onSurfaceVariant) }
             Text("${currentMonth.year} ${currentMonth.month.getDisplayName(TextStyle.FULL, Locale.TAIWAN)}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
-            IconButton(onClick = { onMonthChange(currentMonth.plusMonths(1)) }, Modifier.size(32.dp)) { Text(">", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            IconButton(onClick = onNextClick, Modifier.size(32.dp)) { Text(">", color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
+    }
+}
+
+@Composable
+private fun MonthPickerDialog(
+    currentMonth: YearMonth,
+    onDismiss: () -> Unit,
+    onConfirm: (YearMonth) -> Unit
+) {
+    val yearRange = remember(currentMonth) { (currentMonth.year - 5..currentMonth.year + 5).toList() }
+    val monthRange = remember { (1..12).toList() }
+    var yearIndex by remember(currentMonth) { mutableStateOf(yearRange.indexOf(currentMonth.year).coerceAtLeast(0)) }
+    var monthIndex by remember(currentMonth) { mutableStateOf((currentMonth.monthValue - 1).coerceIn(0, 11)) }
+    val yearListState = rememberLazyListState(initialFirstVisibleItemIndex = yearIndex.coerceAtLeast(0))
+    val monthListState = rememberLazyListState(initialFirstVisibleItemIndex = monthIndex.coerceAtLeast(0))
+    val scope = rememberCoroutineScope()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.border(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
+            shape = AlertDialogDefaults.shape
+        ),
+        title = { Text("選擇年月") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("年份", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        WheelPicker(
+                            options = yearRange.map { it.toString() },
+                            selectedIndex = yearIndex,
+                            listState = yearListState,
+                            onSelectedIndexChange = { yearIndex = it }
+                        )
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("月份", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        WheelPicker(
+                            options = monthRange.map { it.toString().padStart(2, '0') },
+                            selectedIndex = monthIndex,
+                            listState = monthListState,
+                            onSelectedIndexChange = { monthIndex = it }
+                        )
+                    }
+                }
+                TextButton(
+                    onClick = {
+                        yearIndex = yearRange.indexOf(currentMonth.year).coerceAtLeast(0)
+                        monthIndex = (currentMonth.monthValue - 1).coerceIn(0, 11)
+                        scope.launch {
+                            yearListState.animateScrollToItem(yearIndex)
+                            monthListState.animateScrollToItem(monthIndex)
+                        }
+                    },
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                ) {
+                    Text("回到本月")
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val year = yearRange.getOrNull(yearIndex) ?: currentMonth.year
+                val month = monthRange.getOrNull(monthIndex) ?: currentMonth.monthValue
+                onConfirm(YearMonth.of(year, month.coerceIn(1, 12)))
+            }) { Text("確定") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
+    )
+}
+
+@Composable
+private fun WheelPicker(
+    options: List<String>,
+    selectedIndex: Int,
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    onSelectedIndexChange: (Int) -> Unit
+) {
+    val itemHeight = 36.dp
+    val visibleItems = 5
+    val pickerHeight = itemHeight * visibleItems
+    val density = LocalDensity.current
+    val itemHeightPx = with(density) { itemHeight.toPx() }
+
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+            .collectLatest { (index, offset) ->
+                val next = if (offset > itemHeightPx * 0.5f) index + 1 else index
+                onSelectedIndexChange(next.coerceIn(0, options.lastIndex))
+            }
+    }
+
+    Box(modifier = Modifier.height(pickerHeight).width(90.dp)) {
+        LazyColumn(
+            state = listState,
+            contentPadding = PaddingValues(vertical = itemHeight * 2),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            itemsIndexed(options) { index, value ->
+                val isSelected = index == selectedIndex
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(itemHeight),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = value,
+                        style = if (isSelected) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodySmall,
+                        color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+        Box(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+        )
+        Box(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .fillMaxWidth()
+                .height(itemHeight)
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.15f))
+        )
     }
 }
 
@@ -541,6 +762,7 @@ private fun EditTransactionDialog(
 }
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 private fun AnnouncementBannerView(text: String, type: String) {
     val bg = when (type) {
         "warning" -> Color(0xFFFFEDD5)
@@ -552,8 +774,26 @@ private fun AnnouncementBannerView(text: String, type: String) {
         "error" -> Color(0xFF991B1B)
         else -> MaterialTheme.colorScheme.onPrimaryContainer
     }
-    Box(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(bg).padding(vertical = 6.dp, horizontal = 16.dp)) {
-        Text(text, color = txt, maxLines = 1, modifier = Modifier.horizontalScroll(rememberScrollState()))
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(bg)
+            .padding(vertical = 6.dp, horizontal = 16.dp)
+    ) {
+        Text(
+            text = text,
+            color = txt,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Clip,
+            modifier = Modifier
+                .fillMaxWidth()
+                .basicMarquee(
+                    animationMode = MarqueeAnimationMode.Immediately,
+                    spacing = MarqueeSpacing(24.dp)
+                )
+        )
     }
 }
 

@@ -1,5 +1,6 @@
 ﻿package com.krendstudio.cloudledger.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -34,8 +35,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.krendstudio.cloudledger.R
 import com.krendstudio.cloudledger.ui.components.AppTextField
 import com.krendstudio.cloudledger.viewmodel.AppViewModel
 import kotlinx.coroutines.launch
@@ -98,13 +101,17 @@ fun OnboardingScreen(viewModel: AppViewModel) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Surface(
                             shape = RoundedCornerShape(16.dp),
-                            color = Color(0xFFF59E0B)
+                            color = Color.White
                         ) {
                             Box(
                                 modifier = Modifier.size(48.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(text = "CL", color = Color.White, fontWeight = FontWeight.Bold)
+                                Image(
+                                    painter = painterResource(R.drawable.app_logo),
+                                    contentDescription = "CloudLedger Logo",
+                                    modifier = Modifier.size(34.dp)
+                                )
                             }
                         }
                         Spacer(modifier = Modifier.width(12.dp))

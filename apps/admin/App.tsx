@@ -22,6 +22,26 @@ const App = () => {
   const [isSaving, setIsSaving] = React.useState(false);
   const [isLoadingMarquee, setIsLoadingMarquee] = React.useState(false);
   const [statusMessage, setStatusMessage] = React.useState('');
+  const [usageStart, setUsageStart] = React.useState('');
+  const [usageEnd, setUsageEnd] = React.useState('');
+  const [usageLoading, setUsageLoading] = React.useState(false);
+  const [usageMetrics, setUsageMetrics] = React.useState<{
+    activeUsers: number;
+    newUsers: number;
+    sessions: number;
+    eventCount: number;
+  } | null>(null);
+  const [adFreeQuery, setAdFreeQuery] = React.useState('');
+  const [adFreeLoading, setAdFreeLoading] = React.useState(false);
+  const [adFreeSaving, setAdFreeSaving] = React.useState(false);
+  const [adFreeUser, setAdFreeUser] = React.useState<{
+    uid: string;
+    email: string | null;
+    displayName: string | null;
+    isAdFree: boolean;
+    adFreeUpdatedAt: number | null;
+    adFreeUpdatedBy: string | null;
+  } | null>(null);
 
   React.useEffect(() => {
     const unsub = onAuthStateChanged(auth, (nextUser) => {
@@ -75,6 +95,12 @@ const App = () => {
     return new Date(ms - offset).toISOString().slice(0, 16);
   };
 
+  const toDateInput = (date: Date) => date.toISOString().slice(0, 10);
+  const formatDateTime = (ms: number | null) => {
+    if (!ms) return '';
+    return new Date(ms).toLocaleString();
+  };
+
   React.useEffect(() => {
     if (!backendAllowed) return;
     let cancelled = false;
@@ -123,6 +149,14 @@ const App = () => {
     };
   }, [backendAllowed, marqueePlatform]);
 
+  React.useEffect(() => {
+    if (!backendAllowed) return;
+    const today = new Date();
+    const todayStr = toDateInput(today);
+    setUsageStart(todayStr);
+    setUsageEnd(todayStr);
+  }, [backendAllowed]);
+
   const handleSaveMarquee = async () => {
     if (!marqueeText.trim()) {
       setStatusMessage('請輸入跑馬燈內容');
@@ -151,6 +185,106 @@ const App = () => {
       setStatusMessage('儲存失敗，請稍後再試');
     } finally {
       setIsSaving(false);
+      setTimeout(() => setStatusMessage(''), 2500);
+    }
+  };
+
+  const handleLoadUsage = async () => {
+    if (!usageStart || !usageEnd) {
+      setStatusMessage('請設定用量查詢日期');
+      setTimeout(() => setStatusMessage(''), 2500);
+      return;
+    }
+
+    setUsageLoading(true);
+    try {
+      const getUsage = httpsCallable(functions, 'adminGetUsageSummary');
+      const res = await getUsage({ startDate: usageStart, endDate: usageEnd });
+      const data = res.data as {
+        metrics?: {
+          activeUsers?: number;
+          newUsers?: number;
+          sessions?: number;
+          eventCount?: number;
+        };
+      };
+      if (data.metrics) {
+        setUsageMetrics({
+          activeUsers: Number(data.metrics.activeUsers ?? 0),
+          newUsers: Number(data.metrics.newUsers ?? 0),
+          sessions: Number(data.metrics.sessions ?? 0),
+          eventCount: Number(data.metrics.eventCount ?? 0),
+        });
+      } else {
+        setUsageMetrics(null);
+      }
+    } catch (error) {
+      setStatusMessage('讀取用量失敗');
+      setTimeout(() => setStatusMessage(''), 2500);
+    } finally {
+      setUsageLoading(false);
+    }
+  };
+
+  const handleFindAdFreeUser = async () => {
+    if (!adFreeQuery.trim()) {
+      setStatusMessage('請輸入使用者 UID 或 Email');
+      setTimeout(() => setStatusMessage(''), 2500);
+      return;
+    }
+
+    setAdFreeLoading(true);
+    try {
+      const findUser = httpsCallable(functions, 'adminFindUser');
+      const res = await findUser({ identifier: adFreeQuery.trim() });
+      const data = res.data as {
+        exists?: boolean;
+        uid?: string;
+        email?: string | null;
+        displayName?: string | null;
+        isAdFree?: boolean;
+        adFreeUpdatedAt?: number | null;
+        adFreeUpdatedBy?: string | null;
+      };
+      if (!data.exists) {
+        setAdFreeUser(null);
+        setStatusMessage('查無此使用者');
+        setTimeout(() => setStatusMessage(''), 2500);
+        return;
+      }
+      setAdFreeUser({
+        uid: data.uid || '',
+        email: data.email ?? null,
+        displayName: data.displayName ?? null,
+        isAdFree: Boolean(data.isAdFree),
+        adFreeUpdatedAt: data.adFreeUpdatedAt ?? null,
+        adFreeUpdatedBy: data.adFreeUpdatedBy ?? null,
+      });
+    } catch (error) {
+      setStatusMessage('讀取使用者失敗');
+      setTimeout(() => setStatusMessage(''), 2500);
+    } finally {
+      setAdFreeLoading(false);
+    }
+  };
+
+  const handleSetAdFree = async (isAdFree: boolean) => {
+    if (!adFreeUser) return;
+    setAdFreeSaving(true);
+    try {
+      const setAdFree = httpsCallable(functions, 'adminSetAdFree');
+      await setAdFree({ uid: adFreeUser.uid, isAdFree });
+      setAdFreeUser({
+        ...adFreeUser,
+        isAdFree,
+        adFreeUpdatedAt: Date.now(),
+        adFreeUpdatedBy: user?.email ?? null,
+      });
+      setStatusMessage('已更新免廣告狀態');
+    } catch (error) {
+      setStatusMessage('更新失敗，請稍後再試');
+    } finally {
+      setAdFreeSaving(false);
       setTimeout(() => setStatusMessage(''), 2500);
     }
   };
@@ -221,12 +355,62 @@ const App = () => {
         <section className="card stack">
           <h2>用量總覽</h2>
           <div className="muted">
-            可串接用量指標（活躍使用者、儲存量、API 呼叫次數）。
+            透過 Google Analytics 取得活躍使用者、事件等指標。
           </div>
-          <div className="actions">
-            <button className="secondary">重新整理（待實作）</button>
-            <button className="secondary">匯出（待實作）</button>
+          <div className="stack">
+            <label className="muted">
+              起始日期
+              <input
+                type="date"
+                value={usageStart}
+                onChange={(event) => setUsageStart(event.target.value)}
+              />
+            </label>
+            <label className="muted">
+              結束日期
+              <input
+                type="date"
+                value={usageEnd}
+                onChange={(event) => setUsageEnd(event.target.value)}
+              />
+            </label>
+            <div className="actions">
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => {
+                  const today = toDateInput(new Date());
+                  setUsageStart(today);
+                  setUsageEnd(today);
+                }}
+              >
+                今日
+              </button>
+              <button onClick={handleLoadUsage} disabled={usageLoading}>
+                {usageLoading ? '讀取中...' : '重新整理'}
+              </button>
+            </div>
           </div>
+          {usageMetrics ? (
+            <div className="stack">
+              <div className="card">
+                <div className="muted">活躍使用者</div>
+                <div className="title">{usageMetrics.activeUsers}</div>
+              </div>
+              <div className="card">
+                <div className="muted">新使用者</div>
+                <div className="title">{usageMetrics.newUsers}</div>
+              </div>
+              <div className="card">
+                <div className="muted">工作階段</div>
+                <div className="title">{usageMetrics.sessions}</div>
+              </div>
+              <div className="card">
+                <div className="muted">事件數</div>
+                <div className="title">{usageMetrics.eventCount}</div>
+              </div>
+            </div>
+          ) : null}
         </section>
 
         <section className="card stack">
@@ -239,6 +423,66 @@ const App = () => {
             <button className="secondary">查詢（待實作）</button>
             <button className="secondary">開啟紀錄（待實作）</button>
           </div>
+        </section>
+
+        <section className="card stack">
+          <h2>免廣告帳號</h2>
+          <div className="muted">
+            查詢使用者並切換免廣告狀態。
+          </div>
+          <div className="stack">
+            <label className="muted">
+              使用者 UID / Email
+              <input
+                placeholder="輸入 UID 或 Email"
+                value={adFreeQuery}
+                onChange={(event) => setAdFreeQuery(event.target.value)}
+              />
+            </label>
+            <div className="actions">
+              <button onClick={handleFindAdFreeUser} disabled={adFreeLoading}>
+                {adFreeLoading ? '查詢中...' : '查詢'}
+              </button>
+            </div>
+          </div>
+          {adFreeUser ? (
+            <div className="stack">
+              <div className="muted">UID：{adFreeUser.uid}</div>
+              {adFreeUser.email ? <div className="muted">Email：{adFreeUser.email}</div> : null}
+              {adFreeUser.displayName ? <div className="muted">名稱：{adFreeUser.displayName}</div> : null}
+              <div className="muted">
+                狀態：{adFreeUser.isAdFree ? '免廣告' : '一般'}
+              </div>
+              {adFreeUser.adFreeUpdatedAt ? (
+                <div className="muted">
+                  更新時間：{formatDateTime(adFreeUser.adFreeUpdatedAt)}
+                </div>
+              ) : null}
+              {adFreeUser.adFreeUpdatedBy ? (
+                <div className="muted">
+                  更新人員：{adFreeUser.adFreeUpdatedBy}
+                </div>
+              ) : null}
+              <div className="actions">
+                <button
+                  type="button"
+                  className={adFreeUser.isAdFree ? '' : 'secondary'}
+                  onClick={() => handleSetAdFree(true)}
+                  disabled={adFreeSaving}
+                >
+                  設為免廣告
+                </button>
+                <button
+                  type="button"
+                  className={!adFreeUser.isAdFree ? '' : 'secondary'}
+                  onClick={() => handleSetAdFree(false)}
+                  disabled={adFreeSaving}
+                >
+                  取消免廣告
+                </button>
+              </div>
+            </div>
+          ) : null}
         </section>
 
         <section className="card stack">

@@ -16,7 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,12 +30,16 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -54,20 +58,26 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.activity.compose.BackHandler
 import coil.compose.AsyncImage
 import com.krendstudio.cloudledger.model.LedgerMember
 import com.krendstudio.cloudledger.model.Transaction
 import com.krendstudio.cloudledger.model.TransactionType
+import com.krendstudio.cloudledger.ui.components.AdBanner
 import com.krendstudio.cloudledger.ui.components.DropdownField
 import com.krendstudio.cloudledger.util.DateUtils
 import com.krendstudio.cloudledger.util.formatNumber
 import com.krendstudio.cloudledger.util.formatPlainNumber
 import com.krendstudio.cloudledger.viewmodel.AppViewModel
+import com.krendstudio.cloudledger.R
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 @Composable
@@ -77,6 +87,7 @@ fun TransactionsScreen(viewModel: AppViewModel) {
     val incomeCategories by viewModel.incomeCategories.collectAsState()
     val members by viewModel.members.collectAsState()
     val authState by viewModel.authState.collectAsState()
+    val isAdFree by viewModel.isAdFree.collectAsState()
 
     var search by remember { mutableStateOf("") }
     var debouncedSearch by remember { mutableStateOf("") }
@@ -111,6 +122,10 @@ fun TransactionsScreen(viewModel: AppViewModel) {
     }
     val availableMembers = members.ifEmpty { listOfNotNull(fallbackMember) }
     val membersById = remember(availableMembers) { availableMembers.associateBy { it.uid } }
+
+    BackHandler(enabled = editing != null) {
+        editing = null
+    }
 
     Column(
         modifier = Modifier
@@ -200,15 +215,27 @@ fun TransactionsScreen(viewModel: AppViewModel) {
                     Text(text = "沒有符合條件的紀錄", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             } else {
+                val adUnitId = stringResource(id = R.string.admob_banner_id)
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(filtered, key = { it.id }) { tx ->
+                    itemsIndexed(filtered, key = { _, tx -> tx.id }) { index, tx ->
                         val targetId = tx.targetUserUid ?: tx.creatorUid
                         val member = membersById[targetId]
-                        TransactionRow(
-                            transaction = tx,
-                            member = member,
-                            onClick = { editing = tx }
-                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TransactionRow(
+                                transaction = tx,
+                                member = member,
+                                onClick = { editing = tx }
+                            )
+                            if (!isAdFree && (index + 1) % 8 == 0) {
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = MaterialTheme.colorScheme.surface,
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                                ) {
+                                    AdBanner(adUnitId = adUnitId, modifier = Modifier.fillMaxWidth())
+                                }
+                            }
+                        }
                     }
                     item { Spacer(modifier = Modifier.height(16.dp)) }
                 }
@@ -252,7 +279,8 @@ private fun CompactInputField(
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
     readOnly: Boolean = false,
-    trailingIcon: ImageVector? = null
+    trailingIcon: ImageVector? = null,
+    onTrailingIconClick: (() -> Unit)? = null
 ) {
     Column(modifier = modifier) {
         Text(
@@ -285,12 +313,23 @@ private fun CompactInputField(
                         innerTextField()
                     }
                     if (trailingIcon != null) {
-                        Icon(
-                            imageVector = trailingIcon,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        if (onTrailingIconClick != null) {
+                            IconButton(onClick = onTrailingIconClick, modifier = Modifier.size(28.dp)) {
+                                Icon(
+                                    imageVector = trailingIcon,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        } else {
+                            Icon(
+                                imageVector = trailingIcon,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }
@@ -299,6 +338,7 @@ private fun CompactInputField(
 }
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 private fun EditTransactionDialog(
     transaction: Transaction,
     expenseCategories: List<String>,
@@ -316,8 +356,15 @@ private fun EditTransactionDialog(
     var date by remember {
         mutableStateOf(DateUtils.parseLocalDate(transaction.date) ?: LocalDate.now())
     }
+    var dateText by remember {
+        mutableStateOf(date.format(DateTimeFormatter.ofPattern("yyyy/MM/dd")))
+    }
     var targetUserUid by remember { mutableStateOf(transaction.targetUserUid) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showDatePicker by remember { mutableStateOf(false) }
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+    )
 
     val categories = if (type == TransactionType.EXPENSE) expenseCategories else incomeCategories
 
@@ -328,15 +375,14 @@ private fun EditTransactionDialog(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.65f)) // 背景暗度
                 .clickable(onClick = onDismiss),
             contentAlignment = Alignment.Center
         ) {
             Surface(
                 shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surface, // 改為主題色
+                color = MaterialTheme.colorScheme.surface,
                 modifier = Modifier
-                    .fillMaxWidth(0.92f)
+                    .fillMaxWidth(0.99f)
                     .clickable(enabled = false) { }
             ) {
                 Column(
@@ -395,13 +441,17 @@ private fun EditTransactionDialog(
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Bottom) {
                         CompactInputField(
                             label = "日期",
-                            value = date.format(DateTimeFormatter.ofPattern("yyyy/MM/dd")),
+                            value = dateText,
                             onValueChange = {
+                                dateText = it
                                 val parsed = DateUtils.parseLocalDate(it)
-                                if (parsed != null) date = parsed
+                                if (parsed != null) {
+                                    date = parsed
+                                }
                             },
                             modifier = Modifier.weight(1f),
-                            trailingIcon = Icons.Default.CalendarToday
+                            trailingIcon = Icons.Default.CalendarToday,
+                            onTrailingIconClick = { showDatePicker = true }
                         )
                         if (members.isNotEmpty()) {
                             DropdownField(
@@ -485,6 +535,31 @@ private fun EditTransactionDialog(
                 TextButton(onClick = { showDeleteConfirm = false }) { Text("取消") }
             }
         )
+    }
+
+    if (showDatePicker) {
+        LaunchedEffect(showDatePicker) {
+            if (showDatePicker) {
+                datePickerState.selectedDateMillis = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            }
+        }
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let {
+                        date = Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate()
+                        dateText = date.format(DateTimeFormatter.ofPattern("yyyy/MM/dd"))
+                    }
+                    showDatePicker = false
+                }) { Text("確定") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("取消") }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
     }
 }
 

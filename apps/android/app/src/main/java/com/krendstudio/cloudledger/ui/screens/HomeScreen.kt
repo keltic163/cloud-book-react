@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
@@ -33,6 +34,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -50,8 +52,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
+import androidx.activity.compose.BackHandler
 import coil.compose.AsyncImage
 import com.krendstudio.cloudledger.R
+import com.krendstudio.cloudledger.model.LedgerMember
+import com.krendstudio.cloudledger.ui.components.DayTransactionsSheet
 import com.krendstudio.cloudledger.viewmodel.AppViewModel
 import com.krendstudio.cloudledger.viewmodel.LedgerUiState
 import kotlinx.coroutines.launch
@@ -64,6 +69,10 @@ fun HomeScreen(viewModel: AppViewModel, ledgerState: LedgerUiState) {
     val authState by viewModel.authState.collectAsState()
     val daySheetOpen by viewModel.daySheetOpen.collectAsState()
     val selectedDate by viewModel.selectedDate.collectAsState()
+    val transactions by viewModel.transactions.collectAsState()
+    val expenseCategories by viewModel.expenseCategories.collectAsState()
+    val incomeCategories by viewModel.incomeCategories.collectAsState()
+    val members by viewModel.members.collectAsState()
     val scope = rememberCoroutineScope()
     val tabs = listOf(
         HomeTab("首頁", Icons.Outlined.Home),
@@ -75,6 +84,28 @@ fun HomeScreen(viewModel: AppViewModel, ledgerState: LedgerUiState) {
     var selectedIndex by remember { mutableStateOf(0) }
     var pendingSmartVoice by remember { mutableStateOf(false) }
     var syncing by remember { mutableStateOf(false) }
+    val navBarHeight = 64.dp
+
+    val fallbackMember = authState.user?.let {
+        LedgerMember(uid = it.uid, displayName = it.displayName, photoUrl = it.photoUrl)
+    }
+    val availableMembers = members.ifEmpty { listOfNotNull(fallbackMember) }
+    val membersById = remember(availableMembers) { availableMembers.associateBy { it.uid } }
+
+    androidx.compose.runtime.LaunchedEffect(selectedIndex) {
+        if (selectedIndex != 0 && daySheetOpen) {
+            viewModel.setDaySheetOpen(false)
+            viewModel.setSelectedDate(LocalDate.now())
+        }
+    }
+
+    BackHandler(enabled = daySheetOpen) {
+        viewModel.setDaySheetOpen(false)
+        viewModel.setSelectedDate(LocalDate.now())
+    }
+    BackHandler(enabled = selectedIndex != 0 && !daySheetOpen) {
+        selectedIndex = 0
+    }
 
     Box(
         modifier = Modifier
@@ -88,9 +119,11 @@ fun HomeScreen(viewModel: AppViewModel, ledgerState: LedgerUiState) {
                 color = MaterialTheme.colorScheme.surface, // 跟隨主題
                 tonalElevation = 0.dp
             ) {
+                @Suppress("UnusedBoxWithConstraintsScope")
                 BoxWithConstraints(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .statusBarsPadding()
                         .padding(horizontal = 16.dp, vertical = 8.dp)
                 ) {
                     val showName = maxWidth >= 480.dp
@@ -192,7 +225,10 @@ fun HomeScreen(viewModel: AppViewModel, ledgerState: LedgerUiState) {
                         .padding(bottom = 48.dp)
                 ) {
                     when (selectedIndex) {
-                        0 -> DashboardScreen(viewModel)
+                        0 -> Column {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            DashboardScreen(viewModel)
+                        }
                         1 -> TransactionsScreen(viewModel)
                         2 -> AddTransactionScreen(
                             viewModel = viewModel,
@@ -204,6 +240,26 @@ fun HomeScreen(viewModel: AppViewModel, ledgerState: LedgerUiState) {
                         else -> SettingsScreen(viewModel)
                     }
                 }
+            }
+        }
+
+        val currentSheetDate = selectedDate
+        if (daySheetOpen && currentSheetDate != null) {
+            Box(modifier = Modifier.fillMaxSize().zIndex(1f)) {
+                DayTransactionsSheet(
+                    date = currentSheetDate,
+                    transactions = transactions,
+                    membersById = membersById,
+                    expenseCategories = expenseCategories,
+                    incomeCategories = incomeCategories,
+                    members = availableMembers,
+                    navBarHeight = navBarHeight,
+                    viewModel = viewModel,
+                    onDismiss = {
+                        viewModel.setDaySheetOpen(false)
+                        viewModel.setSelectedDate(LocalDate.now())
+                    }
+                )
             }
         }
 

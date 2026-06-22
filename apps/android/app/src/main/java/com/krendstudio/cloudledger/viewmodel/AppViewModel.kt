@@ -86,6 +86,9 @@ class AppViewModel(
     private val _recurringTemplates = MutableStateFlow<List<RecurringTemplate>>(emptyList())
     val recurringTemplates: StateFlow<List<RecurringTemplate>> = _recurringTemplates.asStateFlow()
 
+    private val _isAdFree = MutableStateFlow(false)
+    val isAdFree: StateFlow<Boolean> = _isAdFree.asStateFlow()
+
     private var ledgerJob: Job? = null
     private var metaJob: Job? = null
     private var transactionsJob: Job? = null
@@ -348,18 +351,32 @@ class AppViewModel(
         val ledgerId = _ledgerState.value.currentLedgerId
             ?: return Result.failure(IllegalStateException("Missing ledger"))
         val user = _authState.value.user ?: return Result.failure(IllegalStateException("Missing user"))
-        val result = ledgerRepository.addTransaction(
-            ledgerId = ledgerId,
-            user = user,
-            amount = amount,
-            type = type,
-            category = category,
-            description = description,
-            rewards = rewards,
-            date = date.format(dateFormatter),
-            targetUserUid = targetUserUid
-        )
-        if (result.isSuccess) {
+        val result = if (_authState.value.isMockMode) {
+            ledgerRepository.addLocalTransaction(
+                ledgerId = ledgerId,
+                user = user,
+                amount = amount,
+                type = type,
+                category = category,
+                description = description,
+                rewards = rewards,
+                date = date.format(dateFormatter),
+                targetUserUid = targetUserUid
+            )
+        } else {
+            ledgerRepository.addTransaction(
+                ledgerId = ledgerId,
+                user = user,
+                amount = amount,
+                type = type,
+                category = category,
+                description = description,
+                rewards = rewards,
+                date = date.format(dateFormatter),
+                targetUserUid = targetUserUid
+            )
+        }
+        if (result.isSuccess && !_authState.value.isMockMode) {
             ledgerRepository.syncTransactions(ledgerId)
         }
         return result
@@ -458,7 +475,7 @@ class AppViewModel(
         category: String,
         intervalMonths: Int,
         executeDay: Int,
-        nextRunAt: Long,
+        baseDate: String,
         totalRuns: Int?,
         remainingRuns: Int?
     ): Result<Unit> {
@@ -475,7 +492,7 @@ class AppViewModel(
             note = null,
             intervalMonths = intervalMonths,
             executeDay = executeDay,
-            nextRunAt = nextRunAt,
+            baseDate = baseDate,
             totalRuns = totalRuns,
             remainingRuns = remainingRuns
         )
@@ -551,6 +568,7 @@ class AppViewModel(
         if (user == null) {
             currentLedgerId = null
             _ledgerState.value = LedgerUiState(isInitializing = false)
+            _isAdFree.value = false
             clearLedgerObservers()
             return
         }
@@ -563,6 +581,7 @@ class AppViewModel(
                     currentLedgerId = profile.lastLedgerId,
                     isInitializing = false
                 )
+                _isAdFree.value = profile.isAdFree
                 if (currentLedgerId != profile.lastLedgerId) {
                     currentLedgerId = profile.lastLedgerId
                     startLedgerObservers(profile.lastLedgerId)

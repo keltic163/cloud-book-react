@@ -35,6 +35,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
+import androidx.activity.compose.BackHandler
 import com.krendstudio.cloudledger.model.LedgerMember
 import com.krendstudio.cloudledger.model.ParsedTransaction
 import com.krendstudio.cloudledger.model.TransactionType
@@ -47,7 +48,6 @@ import java.time.LocalDate
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import kotlin.math.max
 import java.util.Locale
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -168,6 +168,13 @@ fun AddTransactionScreen(
     val fallbackMember = authState.user?.let { LedgerMember(uid = it.uid, displayName = it.displayName, photoUrl = it.photoUrl) }
     val availableMembers = members.ifEmpty { listOfNotNull(fallbackMember) }
 
+    BackHandler(enabled = showDatePicker || showVoicePrompt) {
+        when {
+            showDatePicker -> showDatePicker = false
+            showVoicePrompt -> showVoicePrompt = false
+        }
+    }
+
     Column(
         modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -227,8 +234,14 @@ fun AddTransactionScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         StatLabel("回饋 / 點數")
                         Spacer(Modifier.width(6.dp))
-                        Box(Modifier.clip(RoundedCornerShape(0.dp)).background(Color(0xFFF59E0B)).padding(horizontal = 4.dp, vertical = 1.dp)) {
-                            Text("選填", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(Color(0xFFF59E0B))
+                                .padding(horizontal = 4.dp, vertical = 1.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("選填", color = Color.White, fontSize = 8.sp, lineHeight = 8.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                     CompactTextField(value = rewardsText, onValueChange = { rewardsText = it }, modifier = Modifier.fillMaxWidth(), keyboardType = KeyboardType.Number)
@@ -288,7 +301,6 @@ fun AddTransactionScreen(
                             if (isRecurring) {
                                 val interval = intervalMonthsText.toIntOrNull() ?: 1
                                 val executeDay = executeDayText.toIntOrNull() ?: date.dayOfMonth
-                                val nextRunAt = computeNextRunAt(date, interval, executeDay)
                                 val totalRunsNum = if (limitedRuns) totalRunsText.toIntOrNull() else null
                                 
                                 viewModel.createRecurringTemplate(
@@ -298,7 +310,7 @@ fun AddTransactionScreen(
                                     category = category,
                                     intervalMonths = interval,
                                     executeDay = executeDay,
-                                    nextRunAt = nextRunAt,
+                                    baseDate = date.toString(),
                                     totalRuns = totalRunsNum,
                                     remainingRuns = totalRunsNum
                                 ).onFailure { saveStatus = "固定收支建立失敗：${it.message}" }
@@ -518,21 +530,6 @@ private fun TabButtonSmall(text: String, selected: Boolean, modifier: Modifier, 
             Text(text, style = MaterialTheme.typography.labelMedium, color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
-}
-
-private fun computeNextRunAt(baseDate: LocalDate, intervalMonths: Int, executeDay: Int): Long {
-    val safeInterval = max(1, intervalMonths)
-    val safeDay = executeDay.coerceIn(1, 31)
-    val baseMonth = baseDate.withDayOfMonth(1)
-    val daysInBase = baseMonth.lengthOfMonth()
-    val baseRunDay = safeDay.coerceAtMost(daysInBase)
-    var next = baseMonth.withDayOfMonth(baseRunDay)
-    if (!next.isAfter(baseDate)) {
-        val nextMonth = baseMonth.plusMonths(safeInterval.toLong())
-        val maxDay = nextMonth.lengthOfMonth()
-        next = nextMonth.withDayOfMonth(safeDay.coerceAtMost(maxDay))
-    }
-    return next.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
 }
 
 private fun launchSpeechInput(

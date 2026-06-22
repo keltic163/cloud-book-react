@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { Transaction, TransactionType } from '../types';
+import { formatTaipeiDate, toDateKey } from '../utils/date';
 
 const TransactionList = () => {
   const { transactions = [], users = [], deleteTransaction, updateTransaction } = useAppContext();
@@ -131,7 +132,7 @@ const TransactionList = () => {
                   </div>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className="text-xs text-slate-400 dark:text-slate-500">
-                      {new Date(t.date).toLocaleDateString()}
+                      {formatTaipeiDate(t.date)}
                     </span>
                     <span className="text-xs text-slate-300 dark:text-slate-600">•</span>
                     <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">{t.category}</span>
@@ -207,7 +208,7 @@ export const EditTransactionModal = ({
   const [category, setCategory] = useState(transaction.category);
   const [description, setDescription] = useState(transaction.description);
   const [rewards, setRewards] = useState(transaction.rewards.toString());
-  const [date, setDate] = useState(transaction.date.split('T')[0]);
+  const [date, setDate] = useState(toDateKey(transaction.date));
   const [targetUserUid, setTargetUserUid] = useState(transaction.targetUserUid || transaction.creatorUid);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 

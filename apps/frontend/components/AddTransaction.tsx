@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { parseSmartInput } from '../services/geminiService';
 import { TransactionType } from '../types';
+import { toDateKey } from '../utils/date';
 import { Mic, MicOff, Check, Wand2 } from 'lucide-react';
 
 // Speech recognition support for browsers
@@ -117,33 +118,6 @@ const AddTransaction: React.FC<Props> = ({ onComplete, autoStartVoice = false })
     }
   }, [date, isRecurring]);
 
-  const addMonthsWithDay = (base: Date, months: number, day: number) => {
-    const year = base.getFullYear();
-    const monthIndex = base.getMonth() + months;
-    const targetYear = year + Math.floor(monthIndex / 12);
-    const targetMonth = ((monthIndex % 12) + 12) % 12;
-    const daysInMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
-    const safeDay = Math.min(day, daysInMonth);
-    const next = new Date(targetYear, targetMonth, safeDay);
-    next.setHours(0, 0, 0, 0);
-    return next;
-  };
-
-  const computeNextRunAt = (day: number, interval: number) => {
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-    const base = new Date(date);
-    base.setHours(0, 0, 0, 0);
-    const daysInMonth = new Date(base.getFullYear(), base.getMonth() + 1, 0).getDate();
-    const safeDay = Math.min(day, daysInMonth);
-    let next = new Date(base.getFullYear(), base.getMonth(), safeDay);
-    next.setHours(0, 0, 0, 0);
-    if (next < now) {
-      next = addMonthsWithDay(next, interval, day);
-    }
-    return next;
-  };
-
   const handleVoiceInput = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
@@ -196,13 +170,14 @@ const AddTransaction: React.FC<Props> = ({ onComplete, autoStartVoice = false })
         return;
       }
 
+      const dateKey = toDateKey(parsed.date ?? date);
       await addTransaction({
         amount: parsed.amount,
         type: parsed.type,
         category: parsed.category,
         description: parsed.description,
         rewards: parsed.rewards || 0,
-        date: parsed.date ? new Date(parsed.date).toISOString() : new Date(date).toISOString(),
+        date: dateKey,
         creatorUid: currentUser.uid,
         targetUserUid: targetUserUid || currentUser.uid,
         ledgerId
@@ -225,13 +200,14 @@ const AddTransaction: React.FC<Props> = ({ onComplete, autoStartVoice = false })
     if (Number.isNaN(amountValue)) return;
 
     try {
+      const dateKey = toDateKey(date);
       await addTransaction({
         amount: amountValue,
         type,
         category,
         description,
         rewards: rewards.trim() === '' ? 0 : parseFloat(rewards) || 0,
-        date: new Date(date).toISOString(),
+        date: dateKey,
         creatorUid: currentUser.uid,
         targetUserUid: targetUserUid || currentUser.uid,
         ledgerId
@@ -240,7 +216,6 @@ const AddTransaction: React.FC<Props> = ({ onComplete, autoStartVoice = false })
       if (isRecurring) {
         const day = Math.min(Math.max(executeDay, 1), 31);
         const interval = Math.max(Number(intervalMonths) || 1, 1);
-        const nextRunAt = computeNextRunAt(day, interval);
         const isLimited = runMode === 'limited';
         const runs = isLimited ? Math.max(parseInt(totalRuns, 10) || 1, 1) : undefined;
 
@@ -252,7 +227,7 @@ const AddTransaction: React.FC<Props> = ({ onComplete, autoStartVoice = false })
           note: '',
           intervalMonths: interval,
           executeDay: day,
-          nextRunAt,
+          baseDate: date,
           totalRuns: runs,
           remainingRuns: runs
         });
