@@ -43,6 +43,34 @@ class LedgerRepository(
     private val functions: FirebaseFunctions = FirebaseProvider.functions
 ) {
     private fun transactionsSyncKey(ledgerId: String) = "transactions:$ledgerId"
+    private fun monthKeyFromDate(date: String) = date.takeIf { it.length >= 7 }?.substring(0, 7)
+    private fun yearFromDate(date: String) = date.takeIf { it.length >= 4 }?.substring(0, 4)?.toIntOrNull()
+
+    private fun buildSearchTokens(
+        description: String,
+        category: String,
+        amount: Double,
+        rewards: Double
+    ): List<String> {
+        val tokens = linkedSetOf<String>()
+        val source = listOf(description, category, amount.toString(), rewards.toString())
+            .joinToString(" ")
+            .lowercase()
+        source.split(Regex("[\\s,，.。:：;；/\\\\|()\\[\\]{}'\"!?！？+\\-]+"))
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .forEach { part ->
+                tokens.add(part)
+                if (part.length >= 2) {
+                    for (size in 2..minOf(4, part.length)) {
+                        for (index in 0..(part.length - size)) {
+                            tokens.add(part.substring(index, index + size))
+                        }
+                    }
+                }
+            }
+        return tokens.take(80)
+    }
 
     fun observeUserProfile(userUid: String): Flow<UserProfile> {
         return combine(
@@ -99,6 +127,13 @@ class LedgerRepository(
             }
     }
 
+    fun observeTransactionsForMonth(ledgerId: String, monthKey: String): Flow<List<Transaction>> {
+        return transactionDao.observeByLedgerMonth(ledgerId, monthKey)
+            .map { entities ->
+                entities.map { it.toModel() }.filterNot { it.deleted }
+            }
+    }
+
     fun observeRecurringTemplates(ledgerId: String, userId: String): Flow<List<RecurringTemplate>> {
         return recurringTemplateDao.observeByLedgerAndUser(ledgerId, userId)
             .map { items -> items.map { it.toModel() } }
@@ -128,20 +163,34 @@ class LedgerRepository(
                 .document(ledgerId)
                 .collection("transactions")
             if (forceFull || lastSyncedAt == 0L) {
-                val snap = collection.orderBy("date", Query.Direction.DESCENDING)
-                    .limit(500)
-                    .get()
-                    .await()
-                val items = snap.documents.mapNotNull { doc ->
-                    parseTransaction(doc.id, doc.data ?: emptyMap(), ledgerId)
-                }.filterNot { it.deleted }
-                transactionDao.deleteByLedger(ledgerId)
-                if (items.isNotEmpty()) {
-                    transactionDao.upsertAll(items.map { it.toEntity() })
+                val items = mutableListOf<Transaction>()
+                var maxUpdatedAt = 0L
+                var lastDoc: com.google.firebase.firestore.DocumentSnapshot? = null
+                var firstPage = true
+                while (true) {
+                    var pageQuery = collection.orderBy("date", Query.Direction.DESCENDING)
+                        .limit(500)
+                    if (lastDoc != null) {
+                        pageQuery = pageQuery.startAfter(lastDoc)
+                    }
+                    val snap = pageQuery.get().await()
+                    if (snap.isEmpty) break
+                    val pageItems = snap.documents.mapNotNull { doc ->
+                        maxUpdatedAt = maxOf(maxUpdatedAt, doc.getLong("updatedAt") ?: 0L)
+                        parseTransaction(doc.id, doc.data ?: emptyMap(), ledgerId)
+                    }.filterNot { it.deleted }
+                    if (firstPage) {
+                        transactionDao.deleteByLedger(ledgerId)
+                        firstPage = false
+                    }
+                    if (pageItems.isNotEmpty()) {
+                        transactionDao.upsertAll(pageItems.map { it.toEntity() })
+                        items.addAll(pageItems)
+                    }
+                    lastDoc = snap.documents.lastOrNull()
+                    if (snap.documents.size < 500) break
                 }
-                val maxUpdatedAt = snap.documents.maxOfOrNull { it.getLong("updatedAt") ?: 0L }
-                    ?: System.currentTimeMillis()
-                syncStateDao.upsert(SyncStateEntity(key, maxUpdatedAt))
+                syncStateDao.upsert(SyncStateEntity(key, maxUpdatedAt.takeIf { it > 0 } ?: System.currentTimeMillis()))
                 return@runCatching items.size
             }
 
@@ -176,6 +225,39 @@ class LedgerRepository(
             }
             syncStateDao.upsert(SyncStateEntity(key, maxUpdatedAt))
             toUpsert.size + toDelete.size
+        }
+    }
+
+    suspend fun getTransactionsForExport(ledgerId: String): Result<List<Transaction>> {
+        return runCatching {
+            val collection = firestore.collection("ledgers")
+                .document(ledgerId)
+                .collection("transactions")
+            val items = mutableListOf<Transaction>()
+            var lastDoc: com.google.firebase.firestore.DocumentSnapshot? = null
+
+            while (true) {
+                var pageQuery = collection.orderBy("date", Query.Direction.DESCENDING)
+                    .limit(500)
+                if (lastDoc != null) {
+                    pageQuery = pageQuery.startAfter(lastDoc)
+                }
+                val snap = pageQuery.get().await()
+                if (snap.isEmpty) break
+                val pageItems = snap.documents.mapNotNull { doc ->
+                    parseTransaction(doc.id, doc.data ?: emptyMap(), ledgerId)
+                }.filterNot { it.deleted }
+                items.addAll(pageItems)
+                lastDoc = snap.documents.lastOrNull()
+                if (snap.documents.size < 500) break
+            }
+
+            transactionDao.deleteByLedger(ledgerId)
+            if (items.isNotEmpty()) {
+                transactionDao.upsertAll(items.map { it.toEntity() })
+            }
+            syncStateDao.upsert(SyncStateEntity(transactionsSyncKey(ledgerId), System.currentTimeMillis()))
+            items
         }
     }
 
@@ -328,6 +410,9 @@ class LedgerRepository(
                 "description" to description,
                 "rewards" to rewards,
                 "date" to date,
+                "monthKey" to monthKeyFromDate(date),
+                "year" to yearFromDate(date),
+                "searchTokens" to buildSearchTokens(description, category, amount, rewards),
                 "creatorUid" to user.uid,
                 "targetUserUid" to targetUserUid,
                 "ledgerId" to ledgerId,
@@ -369,7 +454,10 @@ class LedgerRepository(
                 ledgerId = ledgerId,
                 createdAt = now,
                 updatedAt = now,
-                deleted = false
+                deleted = false,
+                monthKey = monthKeyFromDate(date),
+                year = yearFromDate(date),
+                searchTokens = buildSearchTokens(description, category, amount, rewards)
             )
             transactionDao.upsertAll(listOf(tx.toEntity()))
         }
@@ -416,6 +504,10 @@ class LedgerRepository(
                 error("資料已被其他人更新，請先同步再編輯")
             }
             val payload = updates.toMutableMap()
+            (payload["date"] as? String)?.let { date ->
+                payload["monthKey"] = monthKeyFromDate(date)
+                payload["year"] = yearFromDate(date)
+            }
             payload["updatedAt"] = System.currentTimeMillis()
             docRef.update(payload).await()
         }
@@ -651,6 +743,10 @@ class LedgerRepository(
         val createdAt = (data["createdAt"] as? Number)?.toLong() ?: 0L
         val updatedAt = (data["updatedAt"] as? Number)?.toLong()
         val deleted = data["deleted"] as? Boolean ?: false
+        val monthKey = data["monthKey"] as? String ?: monthKeyFromDate(date)
+        val year = (data["year"] as? Number)?.toInt() ?: yearFromDate(date)
+        val searchTokens = (data["searchTokens"] as? List<*>)?.mapNotNull { it as? String }
+            ?: buildSearchTokens(description, category, amount, rewards)
         return Transaction(
             id = id,
             amount = amount,
@@ -664,7 +760,10 @@ class LedgerRepository(
             ledgerId = ledgerId,
             createdAt = createdAt,
             updatedAt = updatedAt,
-            deleted = deleted
+            deleted = deleted,
+            monthKey = monthKey,
+            year = year,
+            searchTokens = searchTokens
         )
     }
 

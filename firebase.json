@@ -18,19 +18,27 @@
   ],
   "hosting": [
     {
-      "target": "app",
+      "site": "cloudledger",
       "public": "apps/frontend/dist",
       "ignore": [
         "firebase.json",
         "**/.*",
         "**/node_modules/**"
       ],
-      "redirects": [
+      "rewrites": [
         {
           "source": "**",
-          "destination": "https://ledger-butler.web.app/:path*",
-          "type": 301
+          "destination": "/index.html"
         }
+      ]
+    },
+    {
+      "site": "ledger-butler",
+      "public": "apps/frontend/dist",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
       ],
       "rewrites": [
         {

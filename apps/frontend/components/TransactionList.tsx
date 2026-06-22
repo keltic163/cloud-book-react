@@ -4,7 +4,16 @@ import { Transaction, TransactionType } from '../types';
 import { formatTaipeiDate, toDateKey } from '../utils/date';
 
 const TransactionList = () => {
-  const { transactions = [], users = [], deleteTransaction, updateTransaction } = useAppContext();
+  const {
+    transactionsPage = [],
+    transactions = [],
+    users = [],
+    deleteTransaction,
+    updateTransaction,
+    loadMoreTransactions,
+    hasMoreTransactions,
+    isLoadingTransactions
+  } = useAppContext();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -19,34 +28,38 @@ const TransactionList = () => {
 
   useEffect(() => {
     setVisibleCount(pageSize);
-  }, [debouncedSearch, transactions.length]);
+  }, [debouncedSearch, transactionsPage.length]);
 
   const filteredTransactions = useMemo(() => {
-    if (!debouncedSearch) return transactions;
+    if (!debouncedSearch) return transactionsPage;
     const tokens = debouncedSearch.split(/\s+/).filter(Boolean);
-    return transactions.filter((t) => {
+    return transactionsPage.filter((t) => {
       const desc = (t.description || '').toLowerCase();
       const cat = (t.category || '').toLowerCase();
       const amt = String(t.amount || '');
       return tokens.every((token) => desc.includes(token) || cat.includes(token) || amt.includes(token));
     });
-  }, [transactions, debouncedSearch]);
+  }, [transactionsPage, debouncedSearch]);
 
-  const hasMore = filteredTransactions.length > visibleCount;
+  const hasMore = filteredTransactions.length > visibleCount || (!debouncedSearch && hasMoreTransactions);
 
   useEffect(() => {
     if (!loadMoreRef.current || !hasMore) return;
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
-          setVisibleCount((prev) => Math.min(prev + pageSize, filteredTransactions.length));
+          if (visibleCount < filteredTransactions.length) {
+            setVisibleCount((prev) => Math.min(prev + pageSize, filteredTransactions.length));
+          } else if (!debouncedSearch && hasMoreTransactions && !isLoadingTransactions) {
+            loadMoreTransactions();
+          }
         }
       },
       { rootMargin: '200px' }
     );
     observer.observe(loadMoreRef.current);
     return () => observer.disconnect();
-  }, [hasMore, filteredTransactions.length, pageSize]);
+  }, [hasMore, filteredTransactions.length, pageSize, visibleCount, debouncedSearch, hasMoreTransactions, isLoadingTransactions, loadMoreTransactions]);
 
   const getCategoryColor = (cat: string) => {
     switch (cat) {
@@ -64,7 +77,7 @@ const TransactionList = () => {
   const getUser = (id: string) => users.find((u) => u.uid === id);
   const editingTransaction = transactions.find((t) => t.id === editingId);
 
-  if (transactions.length === 0) {
+  if (transactionsPage.length === 0 && !isLoadingTransactions) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-slate-400">
         <div className="w-16 h-16 bg-[color:var(--app-bg)] dark:bg-slate-800 rounded-full flex items-center justify-center mb-4 transition-colors">
@@ -80,7 +93,7 @@ const TransactionList = () => {
       <div className="flex items-center justify-between">
         <h3 className="font-bold text-slate-800 dark:text-slate-100 text-lg transition-colors">近期紀錄</h3>
         <div className="text-sm text-slate-500 dark:text-slate-400">
-          總計 {transactions.length} / 符合 {filteredTransactions.length} / 顯示 {Math.min(visibleCount, filteredTransactions.length)}
+          已載入 {transactionsPage.length} / 符合 {filteredTransactions.length} / 顯示 {Math.min(visibleCount, filteredTransactions.length)}
         </div>
       </div>
 
@@ -164,7 +177,13 @@ const TransactionList = () => {
         <div className="flex flex-col items-center gap-3 pt-2">
           <button
             type="button"
-            onClick={() => setVisibleCount((prev) => Math.min(prev + pageSize, filteredTransactions.length))}
+            onClick={() => {
+              if (visibleCount < filteredTransactions.length) {
+                setVisibleCount((prev) => Math.min(prev + pageSize, filteredTransactions.length));
+              } else {
+                loadMoreTransactions();
+              }
+            }}
             className="px-4 py-2 rounded-full border border-[color:var(--app-border)] dark:border-slate-700 bg-[color:var(--app-surface)] dark:bg-slate-800 text-sm text-slate-600 dark:text-slate-300 hover:border-indigo-300 dark:hover:border-indigo-500/60 transition-colors"
           >
             載入更多

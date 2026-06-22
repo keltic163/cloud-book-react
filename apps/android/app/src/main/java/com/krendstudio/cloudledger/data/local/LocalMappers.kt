@@ -65,7 +65,10 @@ fun TransactionEntity.toModel(): Transaction {
         ledgerId = ledgerId,
         createdAt = createdAt,
         updatedAt = updatedAt,
-        deleted = deleted
+        deleted = deleted,
+        monthKey = monthKey,
+        year = year,
+        searchTokens = decodeStringList(searchTokensJson)
     )
 }
 
@@ -83,7 +86,10 @@ fun Transaction.toEntity(): TransactionEntity {
         targetUserUid = targetUserUid,
         createdAt = createdAt,
         updatedAt = updatedAt,
-        deleted = deleted
+        deleted = deleted,
+        monthKey = monthKey,
+        year = year,
+        searchTokensJson = encodeStringList(searchTokens)
     )
 }
 

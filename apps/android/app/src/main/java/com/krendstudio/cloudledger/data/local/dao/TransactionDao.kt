@@ -12,6 +12,9 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE ledgerId = :ledgerId ORDER BY date DESC")
     fun observeByLedger(ledgerId: String): Flow<List<TransactionEntity>>
 
+    @Query("SELECT * FROM transactions WHERE ledgerId = :ledgerId AND monthKey = :monthKey ORDER BY date DESC")
+    fun observeByLedgerMonth(ledgerId: String, monthKey: String): Flow<List<TransactionEntity>>
+
     @Query("SELECT * FROM transactions WHERE ledgerId = :ledgerId")
     suspend fun getByLedger(ledgerId: String): List<TransactionEntity>
 

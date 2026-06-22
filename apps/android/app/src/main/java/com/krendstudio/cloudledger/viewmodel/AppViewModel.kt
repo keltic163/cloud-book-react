@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.time.LocalDate
+import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 
 data class AuthUiState(
@@ -62,6 +63,9 @@ class AppViewModel(
     private val _transactions = MutableStateFlow<List<Transaction>>(emptyList())
     val transactions: StateFlow<List<Transaction>> = _transactions.asStateFlow()
 
+    private val _dashboardMonthTransactions = MutableStateFlow<List<Transaction>>(emptyList())
+    val dashboardMonthTransactions: StateFlow<List<Transaction>> = _dashboardMonthTransactions.asStateFlow()
+
     private val _expenseCategories = MutableStateFlow(Defaults.expenseCategories)
     val expenseCategories: StateFlow<List<String>> = _expenseCategories.asStateFlow()
 
@@ -92,6 +96,7 @@ class AppViewModel(
     private var ledgerJob: Job? = null
     private var metaJob: Job? = null
     private var transactionsJob: Job? = null
+    private var dashboardMonthJob: Job? = null
     private var recurringJob: Job? = null
     private var currentLedgerId: String? = null
     private var mockMode = false
@@ -171,6 +176,15 @@ class AppViewModel(
                 ledgerRepository.syncRecurringTemplates(ledgerId, user.uid).getOrThrow()
             }
         }
+    }
+
+    suspend fun getTransactionsForExport(): Result<List<Transaction>> {
+        val ledgerId = _ledgerState.value.currentLedgerId
+            ?: return Result.failure(IllegalStateException("Missing ledger"))
+        if (_authState.value.isMockMode) {
+            return Result.success(_transactions.value.filterNot { it.deleted })
+        }
+        return ledgerRepository.getTransactionsForExport(ledgerId)
     }
 
     suspend fun createLedger(name: String): Result<SavedLedger> {
@@ -600,6 +614,7 @@ class AppViewModel(
         clearLedgerObservers()
         if (ledgerId.isNullOrBlank()) {
             _transactions.value = emptyList()
+            _dashboardMonthTransactions.value = emptyList()
             _expenseCategories.value = Defaults.expenseCategories
             _incomeCategories.value = Defaults.incomeCategories
             _members.value = emptyList()
@@ -625,6 +640,8 @@ class AppViewModel(
             }
         }
 
+        observeDashboardMonth(YearMonth.now())
+
         val user = _authState.value.user
         if (user != null) {
             recurringJob = viewModelScope.launch {
@@ -648,10 +665,25 @@ class AppViewModel(
     private fun clearLedgerObservers() {
         metaJob?.cancel()
         transactionsJob?.cancel()
+        dashboardMonthJob?.cancel()
         metaJob = null
         transactionsJob = null
+        dashboardMonthJob = null
         recurringJob?.cancel()
         recurringJob = null
+    }
+
+    fun observeDashboardMonth(month: YearMonth) {
+        val ledgerId = currentLedgerId ?: return
+        val monthKey = "${month.year}-${month.monthValue.toString().padStart(2, '0')}"
+        dashboardMonthJob?.cancel()
+        dashboardMonthJob = viewModelScope.launch {
+            ledgerRepository.observeTransactionsForMonth(ledgerId, monthKey)
+                .catch { _dashboardMonthTransactions.value = emptyList() }
+                .collect { items ->
+                    _dashboardMonthTransactions.value = items
+                }
+        }
     }
 
     private fun observeSystemAnnouncement() {

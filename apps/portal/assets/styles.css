@@ -58,15 +58,10 @@ a {
 .brand-mark {
   width: 56px;
   height: 56px;
-  border-radius: 18px;
-  background: linear-gradient(135deg, #cc7a42, #8d4520);
-  color: #fffaf1;
-  display: grid;
-  place-items: center;
-  font-family: "Gill Sans", "Trebuchet MS", sans-serif;
-  font-size: 26px;
-  font-weight: 700;
-  letter-spacing: 1px;
+  border-radius: 12px;
+  display: block;
+  object-fit: contain;
+  background: #fff;
   box-shadow: var(--shadow);
 }
 

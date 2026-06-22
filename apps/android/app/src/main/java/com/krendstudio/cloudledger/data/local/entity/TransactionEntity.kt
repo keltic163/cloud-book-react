@@ -1,9 +1,16 @@
 package com.krendstudio.cloudledger.data.local.entity
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "transactions")
+@Entity(
+    tableName = "transactions",
+    indices = [
+        Index(value = ["ledgerId", "date"]),
+        Index(value = ["ledgerId", "monthKey"])
+    ]
+)
 data class TransactionEntity(
     @PrimaryKey val id: String,
     val ledgerId: String,
@@ -17,5 +24,8 @@ data class TransactionEntity(
     val targetUserUid: String?,
     val createdAt: Long,
     val updatedAt: Long?,
-    val deleted: Boolean
+    val deleted: Boolean,
+    val monthKey: String?,
+    val year: Int?,
+    val searchTokensJson: String
 )

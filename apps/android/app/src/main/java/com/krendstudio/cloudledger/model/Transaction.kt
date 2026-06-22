@@ -18,5 +18,8 @@ data class Transaction(
     val ledgerId: String,
     val createdAt: Long,
     val updatedAt: Long?,
-    val deleted: Boolean
+    val deleted: Boolean,
+    val monthKey: String? = null,
+    val year: Int? = null,
+    val searchTokens: List<String> = emptyList()
 )

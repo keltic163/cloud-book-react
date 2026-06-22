@@ -70,7 +70,7 @@ import kotlin.math.roundToInt
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(viewModel: AppViewModel) {
-    val transactions by viewModel.transactions.collectAsState()
+    val monthTransactions by viewModel.dashboardMonthTransactions.collectAsState()
     val expenseCategories by viewModel.expenseCategories.collectAsState()
     val incomeCategories by viewModel.incomeCategories.collectAsState()
     val members by viewModel.members.collectAsState()
@@ -95,9 +95,8 @@ fun DashboardScreen(viewModel: AppViewModel) {
     val availableMembers = members.ifEmpty { listOfNotNull(fallbackMember) }
     val membersById = remember(availableMembers) { availableMembers.associateBy { it.uid } }
 
-    val monthTransactions = transactions.filter { transaction ->
-        val date = DateUtils.parseLocalDate(transaction.date)
-        date != null && YearMonth.from(date) == calendarMonth
+    LaunchedEffect(calendarMonth) {
+        viewModel.observeDashboardMonth(calendarMonth)
     }
 
     val monthlyIncome = monthTransactions
@@ -116,10 +115,9 @@ fun DashboardScreen(viewModel: AppViewModel) {
             income to expense
         }
 
-    val rewardStats = remember(monthTransactions, transactions) {
+    val rewardStats = remember(monthTransactions) {
         val monthRewards = monthTransactions.sumOf { it.rewards }
-        val totalRewards = transactions.sumOf { it.rewards }
-        monthRewards to totalRewards
+        monthRewards to monthRewards
     }
 
     @Suppress("UnusedBoxWithConstraintsScope")
@@ -369,7 +367,7 @@ private fun PointRewardCard(month: Double, total: Double) {
             }
             Spacer(Modifier.height(8.dp))
             Text(text = "$${formatNumber(month)}", color = accentColor, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Text(text = "歷史累計: $${formatNumber(total)}", color = accentColor.copy(alpha = 0.8f), style = MaterialTheme.typography.labelSmall)
+            Text(text = "本月已載入: $${formatNumber(total)}", color = accentColor.copy(alpha = 0.8f), style = MaterialTheme.typography.labelSmall)
         }
     }
 }

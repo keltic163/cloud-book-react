@@ -7,6 +7,8 @@ import { db } from '../firebase';
 import { collection, deleteDoc, doc, getDocs, query, updateDoc, where } from 'firebase/firestore';
 import { formatTaipeiDate, toDateKey } from '../utils/date';
 
+const APP_VERSION = '3.5.9';
+
 // --- Icons ---
 const DownloadIcon = ({ className }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -233,6 +235,8 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
     syncTransactions,
     lastSyncedAt,
     isSyncing,
+    getAllTransactionsForExport,
+    importTransactions,
   } = useAppContext();
   const { signOut, user } = useAuth();
 
@@ -254,6 +258,8 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
   const [changelog, setChangelog] = useState<any>(null);
   const [isLoadingChangelog, setIsLoadingChangelog] = useState(false);
   const [editingRecurring, setEditingRecurring] = useState<any | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editAmount, setEditAmount] = useState('');
   const [editType, setEditType] = useState<'expense' | 'income'>('expense');
@@ -425,7 +431,7 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
     }
   };
 
-  const handleExportJSON = () => {
+  const handleExportJSONOld = () => {
     const backupData = {
       version: 1,
       users: users,
@@ -435,7 +441,7 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
     showMsg('success', '完整備份 (JSON) 匯出成功！');
   };
 
-  const handleExportCSV = () => {
+  const handleExportCSVOld = () => {
     const headers = ['Date', 'Type', 'Category', 'Amount', 'Description', 'Rewards', 'Member'];
     const rows = transactions.map((t) => {
       const memberName = users.find((u) => u.uid === t.creatorUid)?.displayName || 'Unknown';
@@ -446,6 +452,57 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
     const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\n');
     downloadFile(csvContent, `CloudLedger_transactions_${getDateStr()}.csv`, 'text/csv;charset=utf-8;');
     showMsg('success', '交易紀錄 (CSV) 匯出成功！');
+  };
+
+  const loadExportTransactions = async () => {
+    const fullTransactions = await getAllTransactionsForExport();
+    if (fullTransactions.length === 0 && transactions.length > 0) {
+      return transactions.filter((item) => !item.deleted);
+    }
+    return fullTransactions;
+  };
+
+  const handleExportJSON = async () => {
+    setIsExporting(true);
+    try {
+      const exportTransactions = await loadExportTransactions();
+      const backupData = {
+        version: 2,
+        exportedAt: new Date().toISOString(),
+        ledgerId,
+        users,
+        transactions: exportTransactions,
+      };
+      downloadFile(JSON.stringify(backupData, null, 2), `CloudLedger_backup_${getDateStr()}.json`, 'application/json');
+      showMsg('success', `JSON 匯出成功，共 ${exportTransactions.length} 筆交易`);
+    } catch (e) {
+      console.error('Export JSON failed:', e);
+      showMsg('error', 'JSON 匯出失敗，請稍後再試');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportCSV = async () => {
+    setIsExporting(true);
+    try {
+      const exportTransactions = await loadExportTransactions();
+      const headers = ['Date', 'Type', 'Category', 'Amount', 'Description', 'Rewards', 'Member'];
+      const rows = exportTransactions.map((t) => {
+        const memberName = users.find((u) => u.uid === (t.targetUserUid || t.creatorUid))?.displayName || users.find((u) => u.uid === t.creatorUid)?.displayName || 'Unknown';
+        const safeDesc = `"${(t.description || '').replace(/"/g, '""')}"`;
+        const dateStr = t.date.split('T')[0];
+        return [dateStr, t.type, t.category, t.amount, safeDesc, t.rewards, `"${memberName}"`].join(',');
+      });
+      const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\n');
+      downloadFile(csvContent, `CloudLedger_transactions_${getDateStr()}.csv`, 'text/csv;charset=utf-8;');
+      showMsg('success', `CSV 匯出成功，共 ${exportTransactions.length} 筆交易`);
+    } catch (e) {
+      console.error('Export CSV failed:', e);
+      showMsg('error', 'CSV 匯出失敗，請稍後再試');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const downloadFile = (content: string, filename: string, mimeType: string) => {
@@ -462,11 +519,111 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
 
   const getDateStr = () => toDateKey(new Date());
 
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportOld = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     showMsg('success', 'CSV 讀取成功！(示意)');
     if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const parseTransactionType = (raw: unknown) => {
+    const normalized = String(raw || '').trim().toLowerCase();
+    if (normalized === 'income' || normalized === '收入') return 'INCOME';
+    return 'EXPENSE';
+  };
+
+  const parseCsvRows = (content: string) => {
+    const rows: string[][] = [];
+    let row: string[] = [];
+    let cell = '';
+    let inQuotes = false;
+    for (let index = 0; index < content.length; index += 1) {
+      const char = content[index];
+      if (char === '"') {
+        if (inQuotes && content[index + 1] === '"') {
+          cell += '"';
+          index += 1;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === ',' && !inQuotes) {
+        row.push(cell);
+        cell = '';
+      } else if ((char === '\n' || char === '\r') && !inQuotes) {
+        if (char === '\r' && content[index + 1] === '\n') index += 1;
+        row.push(cell);
+        if (row.some((value) => value.trim())) rows.push(row);
+        row = [];
+        cell = '';
+      } else {
+        cell += char;
+      }
+    }
+    row.push(cell);
+    if (row.some((value) => value.trim())) rows.push(row);
+    return rows;
+  };
+
+  const parseImportFile = (content: string, filename: string) => {
+    const trimmed = content.trim();
+    if (filename.toLowerCase().endsWith('.json') || trimmed.startsWith('{')) {
+      const root = JSON.parse(trimmed);
+      const source = Array.isArray(root) ? root : root.transactions;
+      if (!Array.isArray(source)) return [];
+      return source.map((item: any) => ({
+        amount: Number(item.amount),
+        type: parseTransactionType(item.type),
+        category: String(item.category || '其他'),
+        description: String(item.description || ''),
+        rewards: Number(item.rewards) || 0,
+        date: String(item.date || '').slice(0, 10),
+        targetUserUid: typeof item.targetUserUid === 'string' ? item.targetUserUid : undefined,
+      }));
+    }
+
+    const rows = parseCsvRows(content);
+    if (rows.length < 2) return [];
+    const headers = rows[0].map((header, index) => (index === 0 ? header.replace(/^\uFEFF/, '') : header).trim().toLowerCase());
+    const indexOf = (...names: string[]) => names.map((name) => headers.indexOf(name)).find((index) => index !== -1);
+    const dateIndex = indexOf('date', '日期');
+    const typeIndex = indexOf('type', '類型');
+    const categoryIndex = indexOf('category', '分類');
+    const amountIndex = indexOf('amount', '金額');
+    const descIndex = indexOf('description', '描述', '備註');
+    const rewardsIndex = indexOf('rewards', '回饋', '點券');
+    const memberIndex = indexOf('member', 'targetuseruid', '成員');
+
+    return rows.slice(1).map((row) => ({
+      amount: Number(amountIndex !== undefined ? row[amountIndex] : NaN),
+      type: parseTransactionType(typeIndex !== undefined ? row[typeIndex] : ''),
+      category: String(categoryIndex !== undefined ? row[categoryIndex] : '其他'),
+      description: String(descIndex !== undefined ? row[descIndex] : ''),
+      rewards: Number(rewardsIndex !== undefined ? row[rewardsIndex] : 0) || 0,
+      date: String(dateIndex !== undefined ? row[dateIndex] : '').slice(0, 10),
+      targetUserUid: memberIndex !== undefined && row[memberIndex] ? row[memberIndex] : undefined,
+    }));
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsImporting(true);
+    try {
+      const content = await file.text();
+      const items = parseImportFile(content, file.name);
+      if (items.length === 0) {
+        showMsg('error', '匯入資料為空或格式不支援');
+        return;
+      }
+      const count = await importTransactions(items as any);
+      showMsg('success', `匯入成功，共 ${count} 筆交易`);
+    } catch (error) {
+      console.error('Import failed:', error);
+      showMsg('error', '匯入失敗，請確認檔案格式');
+    } finally {
+      setIsImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   const showMsg = (type: 'success' | 'error', text: string) => {
@@ -912,6 +1069,7 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
         <div className="grid grid-cols-2 gap-3">
           <button
             onClick={handleExportJSON}
+            disabled={isExporting}
             className="flex flex-col items-center justify-center p-4 bg-[color:var(--app-bg)] dark:bg-slate-800 border border-[color:var(--app-border)] dark:border-slate-700 rounded-xl hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:border-indigo-200 dark:hover:border-indigo-800 transition-all gap-2"
           >
             <DownloadIcon className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
@@ -921,6 +1079,7 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
 
           <button
             onClick={handleExportCSV}
+            disabled={isExporting}
             className="flex flex-col items-center justify-center p-4 bg-[color:var(--app-bg)] dark:bg-slate-800 border border-[color:var(--app-border)] dark:border-slate-700 rounded-xl hover:bg-emerald-50 dark:hover:bg-emerald-900/20 hover:border-emerald-200 dark:hover:border-emerald-800 transition-all gap-2"
           >
             <FileTextIcon className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
@@ -931,12 +1090,13 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
 
         <button
           onClick={() => fileInputRef.current?.click()}
+          disabled={isImporting}
           className="w-full flex items-center justify-center gap-2 p-3 bg-[color:var(--app-surface)] dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl hover:bg-[color:var(--app-bg)] dark:hover:bg-slate-800 transition-colors text-slate-700 dark:text-slate-300 font-medium shadow-sm"
         >
           <UploadIcon className="w-4 h-4" />
           匯入 CSV/JSON 資料
         </button>
-        <input type="file" ref={fileInputRef} onChange={handleImport} accept=".csv" className="hidden" />
+        <input type="file" ref={fileInputRef} onChange={handleImport} accept=".csv,.json,application/json,text/csv" className="hidden" />
       </SectionCard>
 
       <SectionCard title="智慧輸入設定 (AI)" description="Key 只存於本地，不會上傳。" defaultOpen={false}>
@@ -1016,7 +1176,7 @@ const Settings: React.FC<SettingsProps> = ({ onEnterOnboarding }) => {
       </SectionCard>
 
       <div className="text-center text-xs text-slate-400 py-4">
-        CloudLedger 雲記 v3.5.3 © 2026 KrendStudio
+        CloudLedger 雲記 v{APP_VERSION} © 2026 KrendStudio
       </div>
 
       {showLedgerSwitcher && (

@@ -1,5 +1,5 @@
 ﻿import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { Transaction, User, SavedLedger } from '../types';
+import { MonthStats, StatsSummary, StatsSummaryParams, Transaction, TransactionType, User, SavedLedger } from '../types';
 import { DEFAULT_EXPENSE_CATEGORIES, DEFAULT_INCOME_CATEGORIES } from '../constants';
 import { getTaipeiTimestamp } from '../utils/date';
 import { useAuth } from './AuthContext';
@@ -16,6 +16,10 @@ import {
   updateDoc,
   setDoc,
   getDoc,
+  startAfter,
+  writeBatch,
+  QueryDocumentSnapshot,
+  DocumentData,
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 
@@ -61,6 +65,14 @@ interface AppContextType {
   deleteCategory: (type: 'expense' | 'income', category: string) => Promise<void>;
   resetCategories: () => Promise<void>;
   syncTransactions: (forceFull?: boolean) => Promise<void>;
+  transactionsPage: Transaction[];
+  loadMoreTransactions: () => Promise<void>;
+  hasMoreTransactions: boolean;
+  isLoadingTransactions: boolean;
+  getTransactionsForMonth: (year: number, month: number) => Promise<Transaction[]>;
+  getAllTransactionsForExport: () => Promise<Transaction[]>;
+  getStatsSummary: (params: StatsSummaryParams) => Promise<StatsSummary>;
+  importTransactions: (items: Array<Partial<Transaction>>) => Promise<number>;
   lastSyncedAt?: number;
   isSyncing?: boolean;
 }
@@ -71,6 +83,58 @@ const STORAGE_KEY_LEDGER_ID = 'cloudledger_ledger_id';
 const MOCK_STORAGE_KEY_TXS = 'cloudledger_mock_txs';
 const MOCK_STORAGE_KEY_USER_PROFILE = 'cloudledger_mock_profile';
 const STORAGE_KEY_THEME = 'cloudledger_theme';
+const TRANSACTIONS_PAGE_SIZE = 50;
+const STATS_QUERY_PAGE_SIZE = 400;
+
+const emptyMonthStats = (monthKey: string): MonthStats => ({
+  monthKey,
+  year: Number(monthKey.slice(0, 4)) || 0,
+  totalIncome: 0,
+  totalExpense: 0,
+  totalRewards: 0,
+  transactionCount: 0,
+  categoryIncome: {},
+  categoryExpense: {},
+  memberIncome: {},
+  memberExpense: {},
+});
+
+const toMonthKey = (year: number, month: number) => `${year}-${String(month).padStart(2, '0')}`;
+
+const normalizeSearchTokens = (value: string) => value
+  .normalize('NFKC')
+  .toLowerCase()
+  .split(/[\s,，.。:：;；/\\|()[\]{}'"!?！？+-]+/)
+  .map((part) => part.trim())
+  .filter(Boolean);
+
+const buildSearchTokens = (t: Partial<Transaction>) => {
+  const source = [t.description, t.category, t.amount, t.rewards]
+    .filter((value) => value !== undefined && value !== null)
+    .join(' ');
+  const tokens = new Set<string>();
+  normalizeSearchTokens(source).forEach((part) => {
+    tokens.add(part);
+    if (part.length >= 2) {
+      for (let size = 2; size <= Math.min(4, part.length); size += 1) {
+        for (let index = 0; index <= part.length - size; index += 1) {
+          tokens.add(part.slice(index, index + size));
+        }
+      }
+    }
+  });
+  return Array.from(tokens).slice(0, 80);
+};
+
+const withTransactionIndex = <T extends Partial<Transaction>>(t: T): T & { monthKey?: string; year?: number; searchTokens: string[] } => {
+  const date = typeof t.date === 'string' ? t.date.slice(0, 10) : '';
+  return {
+    ...t,
+    monthKey: /^\d{4}-\d{2}/.test(date) ? date.slice(0, 7) : undefined,
+    year: /^\d{4}/.test(date) ? Number(date.slice(0, 4)) : undefined,
+    searchTokens: buildSearchTokens(t),
+  };
+};
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { user: authUser } = useAuth();
@@ -88,6 +152,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Sync state
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [transactionsPage, setTransactionsPage] = useState<Transaction[]>([]);
+  const [lastTransactionsDoc, setLastTransactionsDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const [hasMoreTransactions, setHasMoreTransactions] = useState(false);
+  const [isLoadingTransactions, setIsLoadingTransactions] = useState(false);
 
   // Local fallback state
   const [localUsers] = useState<User[]>([{
@@ -375,6 +443,113 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     });
   };
 
+  const fetchTransactionsPage = useCallback(async (reset = false) => {
+    if (!ledgerId || !db) return;
+    setIsLoadingTransactions(true);
+    try {
+      const base = [
+        collection(db, `ledgers/${ledgerId}/transactions`),
+        orderBy('date', 'desc'),
+        limit(TRANSACTIONS_PAGE_SIZE)
+      ] as const;
+      const q = reset || !lastTransactionsDoc
+        ? query(...base)
+        : query(...base, startAfter(lastTransactionsDoc));
+      const snap = await getDocs(q);
+      const items = snap.docs
+        .map((d) => ({ id: d.id, ...(d.data() as any) } as Transaction))
+        .filter((item) => !item.deleted);
+      setTransactionsPage((prev) => reset ? items : [...prev, ...items]);
+      setTransactions((prev) => {
+        const map = new Map((reset ? [] : prev).map(t => [t.id, t]));
+        items.forEach(item => map.set(item.id, item));
+        return Array.from(map.values()).sort((a, b) => getTaipeiTimestamp(b.date) - getTaipeiTimestamp(a.date));
+      });
+      setLastTransactionsDoc(snap.docs[snap.docs.length - 1] || null);
+      setHasMoreTransactions(snap.docs.length === TRANSACTIONS_PAGE_SIZE);
+    } catch (e) {
+      console.error('Fetch transactions page failed:', e);
+    } finally {
+      setIsLoadingTransactions(false);
+    }
+  }, [ledgerId, lastTransactionsDoc]);
+
+  const loadMoreTransactions = useCallback(async () => {
+    if (isLoadingTransactions || !hasMoreTransactions) return;
+    await fetchTransactionsPage(false);
+  }, [fetchTransactionsPage, hasMoreTransactions, isLoadingTransactions]);
+
+  const getTransactionsForMonth = useCallback(async (year: number, month: number) => {
+    if (!ledgerId || !db) return [];
+    const start = toMonthKey(year, month);
+    const nextYear = month === 12 ? year + 1 : year;
+    const nextMonth = month === 12 ? 1 : month + 1;
+    const end = toMonthKey(nextYear, nextMonth);
+    const results: Transaction[] = [];
+    let cursor: QueryDocumentSnapshot<DocumentData> | null = null;
+
+    while (true) {
+      const base = [
+        collection(db, `ledgers/${ledgerId}/transactions`),
+        where('date', '>=', `${start}-01`),
+        where('date', '<', `${end}-01`),
+        orderBy('date', 'desc'),
+        limit(500)
+      ] as const;
+      const pageQuery = cursor ? query(...base, startAfter(cursor)) : query(...base);
+      const snap = await getDocs(pageQuery);
+      snap.docs.forEach((d) => {
+        const item = { id: d.id, ...(d.data() as any) } as Transaction;
+        if (!item.deleted) results.push(item);
+      });
+      cursor = snap.docs[snap.docs.length - 1] || null;
+      if (snap.docs.length < 500) break;
+    }
+
+    setTransactions((prev) => {
+      const map = new Map(prev.map(t => [t.id, t]));
+      results.forEach(item => map.set(item.id, item));
+      return Array.from(map.values()).sort((a, b) => getTaipeiTimestamp(b.date) - getTaipeiTimestamp(a.date));
+    });
+    return results;
+  }, [ledgerId]);
+
+  const getAllTransactionsForExport = useCallback(async () => {
+    if (isMockMode) {
+      return [...transactions]
+        .filter((item) => !item.deleted)
+        .sort((a, b) => getTaipeiTimestamp(b.date) - getTaipeiTimestamp(a.date));
+    }
+    if (!ledgerId || !db) return [];
+
+    const results: Transaction[] = [];
+    let cursor: QueryDocumentSnapshot<DocumentData> | null = null;
+
+    while (true) {
+      const base = [
+        collection(db, `ledgers/${ledgerId}/transactions`),
+        orderBy('date', 'desc'),
+        limit(500)
+      ] as const;
+      const pageQuery = cursor ? query(...base, startAfter(cursor)) : query(...base);
+      const snap = await getDocs(pageQuery);
+      snap.docs.forEach((d) => {
+        const item = { id: d.id, ...(d.data() as any) } as Transaction;
+        if (!item.deleted) results.push(item);
+      });
+      cursor = snap.docs[snap.docs.length - 1] || null;
+      if (snap.docs.length < 500) break;
+    }
+
+    setTransactions((prev) => {
+      const map = new Map(prev.map(t => [t.id, t]));
+      results.forEach(item => map.set(item.id, item));
+      return Array.from(map.values()).sort((a, b) => getTaipeiTimestamp(b.date) - getTaipeiTimestamp(a.date));
+    });
+
+    return results;
+  }, [ledgerId, transactions]);
+
   const syncTransactions = async (forceFull = false) => {
     if (!ledgerId || !db) return;
     setIsSyncing(true);
@@ -384,7 +559,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       // initial fetch
       if (forceFull || last === 0) {
-        const q = query(collection(db, `ledgers/${ledgerId}/transactions`), orderBy('date', 'desc'), limit(200));
+        const q = query(collection(db, `ledgers/${ledgerId}/transactions`), orderBy('date', 'desc'), limit(TRANSACTIONS_PAGE_SIZE));
         const snap = await getDocs(q);
         processDocs(snap.docs);
 
@@ -431,9 +606,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (isMockMode) {
       const stored = localStorage.getItem(MOCK_STORAGE_KEY_TXS);
       if (stored) {
-        setTransactions(JSON.parse(stored));
+        const parsed = JSON.parse(stored);
+        setTransactions(parsed);
+        setTransactionsPage(parsed);
       } else {
         setTransactions([]);
+        setTransactionsPage([]);
       }
       return;
     }
@@ -441,6 +619,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (!db) return;
 
     const fetchMetadata = async () => {
+      setTransactionsPage([]);
+      setTransactions([]);
+      setLastTransactionsDoc(null);
+      setHasMoreTransactions(false);
       const ledgerRef = doc(db, 'ledgers', ledgerId);
       try {
         const ledgerSnap = await getDoc(ledgerRef);
@@ -472,12 +654,252 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       // initial sync
       await syncTransactions(true);
+      await fetchTransactionsPage(true);
     };
 
     fetchMetadata();
 
     return () => {};
   }, [authUser, ledgerId]);
+
+  const getMonthKeys = (params: StatsSummaryParams) => {
+    if (params.timeRange === 'month') {
+      return [toMonthKey(params.year, params.month || 1)];
+    }
+    return Array.from({ length: 12 }, (_, index) => toMonthKey(params.year, index + 1));
+  };
+
+  const getMonthDateBounds = (monthKey: string) => {
+    const year = Number(monthKey.slice(0, 4));
+    const month = Number(monthKey.slice(5, 7));
+    const nextYear = month === 12 ? year + 1 : year;
+    const nextMonth = month === 12 ? 1 : month + 1;
+    return {
+      start: `${monthKey}-01`,
+      end: `${toMonthKey(nextYear, nextMonth)}-01`,
+    };
+  };
+
+  const readMonthStats = async (monthKey: string): Promise<MonthStats> => {
+    if (!ledgerId || !db) return emptyMonthStats(monthKey);
+    const snap = await getDoc(doc(db, `ledgers/${ledgerId}/monthlyStats`, monthKey));
+    return { ...emptyMonthStats(monthKey), ...(snap.exists() ? snap.data() : {}) } as MonthStats;
+  };
+
+  const fetchTransactionsForStats = async (params: StatsSummaryParams): Promise<Transaction[]> => {
+    if (!ledgerId || !db) return [];
+    const tokens = normalizeSearchTokens(params.keyword || '');
+    const primaryToken = tokens[0];
+    const monthKeys = getMonthKeys(params);
+    const results: Transaction[] = [];
+
+    for (const monthKey of monthKeys) {
+      let cursor: QueryDocumentSnapshot<DocumentData> | null = null;
+      while (true) {
+        const constraints: any[] = [
+          where('monthKey', '==', monthKey),
+          ...(primaryToken ? [where('searchTokens', 'array-contains', primaryToken)] : []),
+          orderBy('date', 'desc'),
+          limit(STATS_QUERY_PAGE_SIZE)
+        ];
+        if (cursor) constraints.push(startAfter(cursor));
+        const snap = await getDocs(query(collection(db, `ledgers/${ledgerId}/transactions`), ...constraints));
+        const page = snap.docs
+          .map((d) => ({ id: d.id, ...(d.data() as any) } as Transaction))
+          .filter((t) => !t.deleted)
+          .filter((t) => {
+            const targetId = t.targetUserUid || t.creatorUid;
+            if (params.selectedMemberId && params.selectedMemberId !== 'all' && targetId !== params.selectedMemberId) return false;
+            if (params.filterCategory && params.filterCategory !== 'all' && t.category !== params.filterCategory) return false;
+            if (tokens.length) {
+              const txTokens = Array.isArray(t.searchTokens) && t.searchTokens.length ? t.searchTokens : buildSearchTokens(t);
+              if (!tokens.every((token) => txTokens.includes(token))) return false;
+            }
+            return true;
+          });
+        results.push(...page);
+        if (snap.docs.length < STATS_QUERY_PAGE_SIZE) break;
+        cursor = snap.docs[snap.docs.length - 1];
+      }
+    }
+    return results;
+  };
+
+  const fetchTransactionsForStatsByDate = async (params: StatsSummaryParams): Promise<Transaction[]> => {
+    if (!ledgerId || !db) return [];
+    const keywordTokens = normalizeSearchTokens(params.keyword || '');
+    const monthKeys = getMonthKeys(params);
+    const results: Transaction[] = [];
+
+    for (const monthKey of monthKeys) {
+      const { start, end } = getMonthDateBounds(monthKey);
+      let cursor: QueryDocumentSnapshot<DocumentData> | null = null;
+      while (true) {
+        const constraints: any[] = [
+          where('date', '>=', start),
+          where('date', '<', end),
+          orderBy('date', 'desc'),
+          limit(STATS_QUERY_PAGE_SIZE)
+        ];
+        if (cursor) constraints.push(startAfter(cursor));
+        const snap = await getDocs(query(collection(db, `ledgers/${ledgerId}/transactions`), ...constraints));
+        const page = snap.docs
+          .map((d) => ({ id: d.id, ...(d.data() as any) } as Transaction))
+          .filter((t) => !t.deleted)
+          .filter((t) => {
+            const targetId = t.targetUserUid || t.creatorUid;
+            if (params.selectedMemberId && params.selectedMemberId !== 'all' && targetId !== params.selectedMemberId) return false;
+            if (params.filterCategory && params.filterCategory !== 'all' && t.category !== params.filterCategory) return false;
+            if (keywordTokens.length) {
+              const haystack = [
+                t.description || '',
+                t.category || '',
+                String(t.amount || ''),
+                String(t.rewards || ''),
+              ].join(' ').normalize('NFKC').toLowerCase();
+              if (!keywordTokens.every((token) => haystack.includes(token))) return false;
+            }
+            return true;
+          });
+        results.push(...page);
+        if (snap.docs.length < STATS_QUERY_PAGE_SIZE) break;
+        cursor = snap.docs[snap.docs.length - 1];
+      }
+    }
+    return results;
+  };
+
+  const buildSummaryFromTransactions = (
+    source: Transaction[],
+    params: StatsSummaryParams,
+    sourceType: StatsSummary['source']
+  ): StatsSummary => {
+    const viewType = params.viewType || TransactionType.EXPENSE;
+    const yearlyData = Array(12).fill(0).map(() => ({ income: 0, expense: 0 }));
+    source.forEach((t) => {
+      const month = Number((t.date || '').slice(5, 7));
+      if (!month || month < 1 || month > 12) return;
+      if (t.type === TransactionType.INCOME) yearlyData[month - 1].income += t.amount;
+      if (t.type === TransactionType.EXPENSE) yearlyData[month - 1].expense += t.amount;
+      if (t.rewards) yearlyData[month - 1].income += t.rewards;
+    });
+    const displayTotalIncome = source.reduce((acc, t) => acc + (t.type === TransactionType.INCOME ? t.amount : 0) + (t.rewards || 0), 0);
+    const displayTotalExpense = source.reduce((acc, t) => acc + (t.type === TransactionType.EXPENSE ? t.amount : 0), 0);
+    const categoryTotals = new Map<string, number>();
+    const memberTotals = new Map<string, number>();
+    source.forEach((t) => {
+      const targetId = t.targetUserUid || t.creatorUid;
+      if (viewType === TransactionType.EXPENSE && t.type === TransactionType.EXPENSE) {
+        categoryTotals.set(t.category, (categoryTotals.get(t.category) || 0) + t.amount);
+        memberTotals.set(targetId, (memberTotals.get(targetId) || 0) + t.amount);
+      }
+      if (viewType === TransactionType.INCOME) {
+        if (t.type === TransactionType.INCOME) {
+          categoryTotals.set(t.category, (categoryTotals.get(t.category) || 0) + t.amount);
+        }
+        if (t.rewards) categoryTotals.set('點券折抵', (categoryTotals.get('點券折抵') || 0) + t.rewards);
+        memberTotals.set(targetId, (memberTotals.get(targetId) || 0) + (t.type === TransactionType.INCOME ? t.amount : 0) + (t.rewards || 0));
+      }
+    });
+    const categoryStats = Array.from(categoryTotals.entries())
+      .map(([name, amount]) => ({ name, amount }))
+      .filter((item) => item.amount > 0)
+      .sort((a, b) => b.amount - a.amount);
+    const memberStats = activeUsers.map((user) => ({
+      ...user,
+      val: memberTotals.get(user.uid) || 0,
+    })).sort((a, b) => b.val - a.val);
+    const chartTotalAmount = categoryStats.reduce((acc, item) => acc + item.amount, 0);
+    return {
+      yearlyData,
+      displayTotalIncome,
+      displayTotalExpense,
+      displayBalance: displayTotalIncome - displayTotalExpense,
+      categoryStats,
+      memberStats,
+      chartTotalAmount,
+      source: sourceType,
+    };
+  };
+
+  const getStatsSummary = async (params: StatsSummaryParams): Promise<StatsSummary> => {
+    if (isMockMode) {
+      return buildSummaryFromTransactions(transactions, params, 'local');
+    }
+    const hasExactFilter = Boolean((params.keyword || '').trim())
+      || (params.selectedMemberId && params.selectedMemberId !== 'all')
+      || (params.filterCategory && params.filterCategory !== 'all');
+    if (hasExactFilter) {
+      const indexedSource = await fetchTransactionsForStats(params);
+      if (indexedSource.length > 0) {
+        return buildSummaryFromTransactions(indexedSource, params, 'query');
+      }
+      const dateSource = await fetchTransactionsForStatsByDate(params);
+      return buildSummaryFromTransactions(dateSource, params, 'query');
+    }
+
+    const viewType = params.viewType || TransactionType.EXPENSE;
+    const monthKeys = getMonthKeys(params);
+    const months = await Promise.all(monthKeys.map(readMonthStats));
+    const aggregateLooksEmpty = months.every((stats: any) =>
+      !stats.transactionCount
+      && !stats.totalIncome
+      && !stats.totalExpense
+      && !stats.totalRewards
+      && Object.keys(stats.categoryIncome || {}).length === 0
+      && Object.keys(stats.categoryExpense || {}).length === 0
+    );
+    if (aggregateLooksEmpty) {
+      const dateSource = await fetchTransactionsForStatsByDate(params);
+      if (dateSource.length > 0) {
+        return buildSummaryFromTransactions(dateSource, params, 'query');
+      }
+    }
+    const yearlyData = Array(12).fill(0).map(() => ({ income: 0, expense: 0 }));
+    months.forEach((stats) => {
+      const month = Number(stats.monthKey.slice(5, 7));
+      if (!month) return;
+      yearlyData[month - 1] = {
+        income: stats.totalIncome || 0,
+        expense: stats.totalExpense || 0,
+      };
+    });
+    const displayTotalIncome = months.reduce((acc, stats) => acc + (stats.totalIncome || 0), 0);
+    const displayTotalExpense = months.reduce((acc, stats) => acc + (stats.totalExpense || 0), 0);
+    const categorySource = viewType === TransactionType.EXPENSE ? 'categoryExpense' : 'categoryIncome';
+    const memberSource = viewType === TransactionType.EXPENSE ? 'memberExpense' : 'memberIncome';
+    const categoryTotals = new Map<string, number>();
+    const memberTotals = new Map<string, number>();
+    months.forEach((stats: any) => {
+      Object.entries(stats[categorySource] || {}).forEach(([name, amount]) => {
+        categoryTotals.set(name, (categoryTotals.get(name) || 0) + Number(amount || 0));
+      });
+      if (viewType === TransactionType.INCOME && stats.totalRewards) {
+        categoryTotals.set('點券折抵', (categoryTotals.get('點券折抵') || 0) + Number(stats.totalRewards || 0));
+      }
+      Object.entries(stats[memberSource] || {}).forEach(([uid, amount]) => {
+        memberTotals.set(uid, (memberTotals.get(uid) || 0) + Number(amount || 0));
+      });
+    });
+    const categoryStats = Array.from(categoryTotals.entries())
+      .map(([name, amount]) => ({ name, amount }))
+      .filter((item) => item.amount > 0)
+      .sort((a, b) => b.amount - a.amount);
+    const memberStats = activeUsers.map((user) => ({
+      ...user,
+      val: memberTotals.get(user.uid) || 0,
+    })).sort((a, b) => b.val - a.val);
+    return {
+      yearlyData,
+      displayTotalIncome,
+      displayTotalExpense,
+      displayBalance: displayTotalIncome - displayTotalExpense,
+      categoryStats,
+      memberStats,
+      chartTotalAmount: categoryStats.reduce((acc, item) => acc + item.amount, 0),
+      source: 'aggregate',
+    };
+  };
 
   // --- Actions ---
 
@@ -714,7 +1136,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const optimistic: Transaction = { ...t, id: tempId, createdAt: now, updatedAt: now, ledgerId, creatorUid: authUser.uid };
     setTransactions(prev => [optimistic, ...prev]);
     try {
-      await addDoc(collection(db, `ledgers/${ledgerId}/transactions`), { ...t, createdAt: now, updatedAt: now, creatorUid: authUser.uid });
+      await addDoc(collection(db, `ledgers/${ledgerId}/transactions`), withTransactionIndex({ ...t, createdAt: now, updatedAt: now, creatorUid: authUser.uid, deleted: false }));
       setTransactions(prev => prev.filter(tx => tx.id !== tempId));
       // refresh incrementally
       await syncTransactions();
@@ -738,7 +1160,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     // optimistic update
     setTransactions(prev => prev.map(t => t.id === id ? { ...t, ...updates, updatedAt: now } : t));
     try {
-      await updateDoc(doc(db, `ledgers/${ledgerId}/transactions`, id), { ...updates, updatedAt: now });
+      const current = transactions.find(t => t.id === id);
+      await updateDoc(doc(db, `ledgers/${ledgerId}/transactions`, id), withTransactionIndex({ ...(current || {}), ...updates, updatedAt: now }));
       // fetch incremental changes
       await syncTransactions();
     } catch (e: any) {
@@ -765,6 +1188,61 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       console.error(e);
       alert(`Delete failed: ${e.message}`);
     }
+  };
+
+  const importTransactions = async (items: Array<Partial<Transaction>>) => {
+    if (!authUser || !ledgerId || items.length === 0) return 0;
+    const now = Date.now();
+    const normalized = items
+      .map((item) => ({
+        amount: Number(item.amount),
+        type: item.type === TransactionType.INCOME ? TransactionType.INCOME : TransactionType.EXPENSE,
+        category: typeof item.category === 'string' && item.category.trim() ? item.category.trim() : '其他',
+        description: typeof item.description === 'string' ? item.description : '',
+        rewards: Number(item.rewards) || 0,
+        date: typeof item.date === 'string' && /^\d{4}-\d{2}-\d{2}/.test(item.date) ? item.date.slice(0, 10) : '',
+        targetUserUid: typeof item.targetUserUid === 'string' && item.targetUserUid ? item.targetUserUid : undefined,
+      }))
+      .filter((item) => Number.isFinite(item.amount) && item.date);
+
+    if (isMockMode) {
+      const imported = normalized.map((item, index) => ({
+        ...item,
+        id: `mock-import-${now}-${index}`,
+        ledgerId,
+        creatorUid: authUser.uid,
+        createdAt: now + index,
+        updatedAt: now + index,
+        deleted: false,
+      } as Transaction));
+      const merged = [...imported, ...transactions].sort((a, b) => getTaipeiTimestamp(b.date) - getTaipeiTimestamp(a.date));
+      setTransactions(merged);
+      setTransactionsPage(merged);
+      localStorage.setItem(MOCK_STORAGE_KEY_TXS, JSON.stringify(merged));
+      return imported.length;
+    }
+    if (!db) return 0;
+
+    for (let index = 0; index < normalized.length; index += 450) {
+      const batch = writeBatch(db);
+      normalized.slice(index, index + 450).forEach((item, offset) => {
+        const createdAt = now + index + offset;
+        const ref = doc(collection(db, `ledgers/${ledgerId}/transactions`));
+        batch.set(ref, withTransactionIndex({
+          ...item,
+          ledgerId,
+          creatorUid: authUser.uid,
+          createdAt,
+          updatedAt: createdAt,
+          deleted: false,
+        }));
+      });
+      await batch.commit();
+    }
+
+    await syncTransactions();
+    await fetchTransactionsPage(true);
+    return normalized.length;
   };
 
   // Placeholders
@@ -815,6 +1293,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       deleteCategory,
       resetCategories,
       syncTransactions,
+      transactionsPage,
+      loadMoreTransactions,
+      hasMoreTransactions,
+      isLoadingTransactions,
+      getTransactionsForMonth,
+      getAllTransactionsForExport,
+      getStatsSummary,
+      importTransactions,
       lastSyncedAt: lastSyncedAt || undefined,
       isSyncing
     }}>

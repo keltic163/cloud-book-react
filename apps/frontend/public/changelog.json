@@ -1,97 +1,38 @@
 {
   "versions": [
     {
-      "version": "3.5.3",
+      "version": "3.5.9",
+      "date": "2026-06-03",
       "notes": [
-        "交易紀錄列表加入分段載入，改善大量資料載入時間。",
-        "日間模式配色參數化，降低刺眼亮度。",
-        "跑馬燈改讀取 web 專用設定 (announcement_web)。"
+        "修正設定頁 CSV/JSON 匯入功能，匯入資料會實際寫入目前帳本並補齊交易索引欄位。",
+        "匯入交易會自動帶入 monthKey、year、searchTokens 與 deleted 狀態，確保統計聚合與搜尋資料維持正確。",
+        "補強 CSV/JSON 備份與還原流程，支援完整帳本匯出後再匯入。"
       ]
     },
     {
-      "version": "3.5.2",
+      "version": "3.5.8",
+      "date": "2026-06-02",
       "notes": [
-        "修復深色主題下狀態列顏色未同步問題",
-        "修復日曆點選後頁面滾動位置錯亂",
-        "回饋/點數預設空白，送出時自動補 0"
+        "\u9996\u9801\u65e5\u66c6\u6539\u70ba\u4f9d\u6708\u4efd\u7368\u7acb\u8f09\u5165\u5b8c\u6574\u4ea4\u6613\uff0c\u4e0d\u518d\u53d7\u6b77\u53f2\u5217\u8868\u76ee\u524d\u5df2\u8f09\u5165\u7b46\u6578\u5f71\u97ff\u3002",
+        "\u8a2d\u5b9a\u9801\u7248\u672c\u865f\u66f4\u65b0\uff0c\u66f4\u65b0\u6b77\u7a0b\u6539\u70ba\u4e7e\u6de8 UTF-8 \u5167\u5bb9\u3002",
+        "\u6aa2\u67e5 Android \u9996\u9801\u8cc7\u6599\u4f86\u6e90\uff0c\u52a0\u5165\u6708\u4efd\u8cc7\u6599\u6d41\u4ee5\u964d\u4f4e\u5927\u91cf\u4ea4\u6613\u6642\u7684 UI \u58d3\u529b\u3002"
       ]
     },
     {
-      "version": "3.5.1",
+      "version": "3.5.7",
+      "date": "2026-06-02",
       "notes": [
-        "新增被記帳人欄位，記帳/編輯可指定對象。",
-        "紀錄列表改顯示被記帳人頭像。",
-        "統計頁改以被記帳人為主。",
-        "記帳欄位高度與版面細節調整。",
-        "設定頁帳本切換操作簡化。"
+        "\u4fee\u6b63 PWA \u820a\u5feb\u53d6\u53ef\u80fd\u8b93 cloudledger.web.app \u7e7c\u7e8c\u8f09\u5165\u820a\u7248\u524d\u7aef\u7684\u554f\u984c\u3002",
+        "\u90e8\u7f72\u89e3\u9664\u820a service worker \u7684\u7248\u672c\uff0c\u8b93\u700f\u89bd\u5668\u56de\u5230\u6700\u65b0 Hosting bundle\u3002"
       ]
     },
     {
-      "version": "3.5.0",
+      "version": "3.5.5",
+      "date": "2026-06-02",
       "notes": [
-        "新增週期性記帳：記帳時可設定每月固定收支。",
-        "後端排程依設定自動建立交易並更新下次執行日。",
-        "設定頁新增固定收支列表，支援編輯/啟用/刪除。",
-        "調正更新紀錄位置"
-      ]
-    },
-    {
-      "version": "3.4.1",
-      "notes": [
-        "回歸用戶引導：可選擇已加入帳本，避免本機資料遺失造成卡關。",
-        "設定頁新增目前帳本切換與管理入口。"
-      ]
-    },
-    {
-      "version": "3.4.0",
-      "notes": [
-        "新手引導流程與帳本生命週期管理。",
-        "Firebase Hosting 強制 HTTPS 重導向。"
-      ]
-    }
-    ,
-    {
-      "version": "3.3.1",
-      "notes": [
-        "iOS Google 登入改用 redirect，popup 失敗會自動轉向；Android 流程不變。",
-        "智慧輸入區新增提示：長按畫面下方的「+」可快速啟動語音辨識。",
-        "同步 UI 調整：主畫面右上角只保留同步按鈕，最後同步時間移到設定頁「資料同步」區塊並可手動同步。",
-        "版本號更新至 3.3.1。"
-      ]
-    },
-    {
-      "version": "3.3.0",
-      "notes": [
-        "混合同步（Hybrid Sync）。",
-        "智慧輸入 BYOK 支援 `DEV_KEY_CODE`。",
-        "長按「+」優化快速加入帳本體驗。"
-      ]
-    },
-    {
-      "version": "3.2.1",
-      "notes": [
-        "PWA 安裝修復版。",
-        "修正 Android 安裝 PWA 首頁異常。",
-        "更新 manifest 的 purpose: 'any maskable'，支援 Adaptive Icons。",
-        "修正 favicon 顯示問題（index.html link 標籤）。"
-      ]
-    },
-    {
-      "version": "3.2.0",
-      "notes": [
-        "PWA 化與 UI 更新。",
-        "新增 vite-plugin-pwa 使網站可安裝。",
-        "新增 Service Worker，加速離線/快取載入。",
-        "UI/UX 微調：新增首屏引導、標題樣式調整。"
-      ]
-    },
-    {
-      "version": "3.1.0",
-      "notes": [
-        "AI 記帳核心。",
-        "串接 Google Gemini API，自然語言記帳（後端能力）。",
-        "接上 Firestore 並部署 Firebase Hosting。",
-        "響應式體驗優化。"
+        "\u6b77\u53f2\u7d00\u9304\u6539\u70ba\u5206\u9801\u8f09\u5165\uff0c\u907f\u514d\u5927\u91cf\u4ea4\u6613\u4e00\u6b21\u6e32\u67d3\u9020\u6210\u5361\u9813\u3002",
+        "\u7d71\u8a08\u9801\u6539\u8b80\u6708\u805a\u5408\u8cc7\u6599\uff0c\u907f\u514d\u4f9d\u8cf4\u524d\u7aef\u53ea\u8f09\u5165\u7684\u90e8\u5206\u4ea4\u6613\u3002",
+        "\u65b0\u589e\u4ea4\u6613\u6708\u4efd\u8207\u641c\u5c0b\u7d22\u5f15\u6b04\u4f4d\uff0c\u652f\u63f4\u5f8c\u7e8c\u7d71\u8a08\u8207\u641c\u5c0b\u8cc7\u6599\u91cd\u5efa\u3002"
       ]
     }
   ]

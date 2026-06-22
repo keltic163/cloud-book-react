@@ -52,7 +52,6 @@ import com.krendstudio.cloudledger.model.TransactionType
 import com.krendstudio.cloudledger.model.LedgerMember
 import com.krendstudio.cloudledger.ui.components.AdBanner
 import com.krendstudio.cloudledger.ui.components.DropdownField
-import com.krendstudio.cloudledger.util.CsvUtils
 import com.krendstudio.cloudledger.viewmodel.AppViewModel
 import kotlinx.coroutines.launch
 import org.json.JSONObject
@@ -67,7 +66,6 @@ fun SettingsScreen(viewModel: AppViewModel) {
     val ledgerState by viewModel.ledgerState.collectAsState()
     val expenseCategories by viewModel.expenseCategories.collectAsState()
     val incomeCategories by viewModel.incomeCategories.collectAsState()
-    val transactions by viewModel.transactions.collectAsState()
     val recurringTemplates by viewModel.recurringTemplates.collectAsState()
     val members by viewModel.members.collectAsState()
     val isAdFree by viewModel.isAdFree.collectAsState()
@@ -153,8 +151,30 @@ fun SettingsScreen(viewModel: AppViewModel) {
         }
     }
 
-    val exportJsonLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri -> uri?.let { writeJson(context, it, transactions) } }
-    val exportCsvLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri -> uri?.let { writeCsv(context, it, transactions) } }
+    val exportJsonLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        uri?.let {
+            scope.launch {
+                viewModel.getTransactionsForExport()
+                    .onSuccess { exportItems ->
+                        writeJson(context, it, exportItems)
+                        message = "JSON 匯出成功，共 ${exportItems.size} 筆"
+                    }
+                    .onFailure { error -> message = "JSON 匯出失敗：${error.message}" }
+            }
+        }
+    }
+    val exportCsvLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+        uri?.let {
+            scope.launch {
+                viewModel.getTransactionsForExport()
+                    .onSuccess { exportItems ->
+                        writeCsv(context, it, exportItems)
+                        message = "CSV 匯出成功，共 ${exportItems.size} 筆"
+                    }
+                    .onFailure { error -> message = "CSV 匯出失敗：${error.message}" }
+            }
+        }
+    }
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let {
             scope.launch {
@@ -928,6 +948,8 @@ private fun formatRecurringDate(nextRunAt: Long): String {
 private fun writeJson(context: Context, uri: Uri, txs: List<Transaction>) {
     try {
         val json = JSONObject().apply {
+            put("version", 2)
+            put("exportedAt", Instant.now().toString())
             put("transactions", org.json.JSONArray().apply {
                 txs.forEach { tx ->
                     put(JSONObject().apply {
@@ -938,6 +960,14 @@ private fun writeJson(context: Context, uri: Uri, txs: List<Transaction>) {
                         put("description", tx.description)
                         put("rewards", tx.rewards)
                         put("date", tx.date)
+                        put("creatorUid", tx.creatorUid)
+                        put("targetUserUid", tx.targetUserUid)
+                        put("ledgerId", tx.ledgerId)
+                        put("createdAt", tx.createdAt)
+                        put("updatedAt", tx.updatedAt)
+                        put("deleted", tx.deleted)
+                        put("monthKey", tx.monthKey)
+                        put("year", tx.year)
                     })
                 }
             })
@@ -948,10 +978,27 @@ private fun writeJson(context: Context, uri: Uri, txs: List<Transaction>) {
 
 private fun writeCsv(context: Context, uri: Uri, txs: List<Transaction>) {
     try {
-        val csv = StringBuilder("Date,Type,Amount,Category,Description,Rewards\n")
-        txs.forEach { csv.append("${it.date},${it.type.name},${it.amount},${it.category},${it.description},${it.rewards}\n") }
+        val csv = StringBuilder("\uFEFFDate,Type,Amount,Category,Description,Rewards,Member\n")
+        txs.forEach {
+            csv.append(
+                listOf(
+                    it.date,
+                    it.type.name,
+                    it.amount.toString(),
+                    it.category,
+                    it.description,
+                    it.rewards.toString(),
+                    it.targetUserUid ?: it.creatorUid
+                ).joinToString(",") { value -> csvCell(value) }
+            ).append("\n")
+        }
         context.contentResolver.openOutputStream(uri)?.use { it.write(csv.toString().toByteArray()) }
     } catch (e: Exception) {}
+}
+
+private fun csvCell(value: String): String {
+    val escaped = value.replace("\"", "\"\"")
+    return "\"$escaped\""
 }
 
 private fun readJson(context: Context, uri: Uri): List<TransactionDraft> {
@@ -967,16 +1014,18 @@ private fun readJson(context: Context, uri: Uri): List<TransactionDraft> {
             val category = obj.optString("category")
             val description = obj.optString("description")
             val date = obj.optString("date")
-            TransactionDraft(amount, type, category, description, rewards, date, null)
+            val targetUserUid = obj.optString("targetUserUid").takeIf { it.isNotBlank() && it != "null" }
+            TransactionDraft(amount, type, category, description, rewards, date, targetUserUid)
         }
     } catch (e: Exception) { emptyList() }
 }
 
 private fun readCsv(context: Context, uri: Uri): List<TransactionDraft> {
     return try {
-        val lines = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readLines() } ?: return emptyList()
-        if (lines.isEmpty()) return emptyList()
-        val headers = CsvUtils.parseLine(lines.first()).mapIndexed { index, value ->
+        val text = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } ?: return emptyList()
+        val records = parseCsvRecords(text)
+        if (records.isEmpty()) return emptyList()
+        val headers = records.first().mapIndexed { index, value ->
             if (index == 0) value.removePrefix("\uFEFF").trim() else value.trim()
         }
         val indexMap = headers.mapIndexed { idx, header -> header.lowercase() to idx }.toMap()
@@ -986,10 +1035,10 @@ private fun readCsv(context: Context, uri: Uri): List<TransactionDraft> {
         val amountIndex = indexMap["amount"]
         val descIndex = indexMap["description"]
         val rewardsIndex = indexMap["rewards"]
+        val memberIndex = indexMap["member"] ?: indexMap["targetuseruid"]
 
-        lines.drop(1).mapNotNull { line ->
-            if (line.isBlank()) return@mapNotNull null
-            val fields = CsvUtils.parseLine(line)
+        records.drop(1).mapNotNull { fields ->
+            if (fields.all { it.isBlank() }) return@mapNotNull null
             val amountRaw = amountIndex?.let { fields.getOrNull(it) } ?: return@mapNotNull null
             val typeRaw = typeIndex?.let { fields.getOrNull(it) } ?: return@mapNotNull null
             val category = categoryIndex?.let { fields.getOrNull(it) } ?: ""
@@ -998,9 +1047,49 @@ private fun readCsv(context: Context, uri: Uri): List<TransactionDraft> {
             val date = dateIndex?.let { fields.getOrNull(it) } ?: ""
             val amount = amountRaw.toDoubleOrNull() ?: return@mapNotNull null
             val rewards = rewardsRaw.toDoubleOrNull() ?: 0.0
-            TransactionDraft(amount, parseTransactionType(typeRaw), category, description, rewards, date, null)
+            val targetUserUid = memberIndex?.let { fields.getOrNull(it) }?.takeIf { it.isNotBlank() }
+            TransactionDraft(amount, parseTransactionType(typeRaw), category, description, rewards, date, targetUserUid)
         }
     } catch (e: Exception) { emptyList() }
+}
+
+private fun parseCsvRecords(text: String): List<List<String>> {
+    val records = mutableListOf<List<String>>()
+    val record = mutableListOf<String>()
+    val cell = StringBuilder()
+    var inQuotes = false
+    var index = 0
+    while (index < text.length) {
+        val char = text[index]
+        when {
+            char == '"' -> {
+                if (inQuotes && index + 1 < text.length && text[index + 1] == '"') {
+                    cell.append('"')
+                    index += 1
+                } else {
+                    inQuotes = !inQuotes
+                }
+            }
+            char == ',' && !inQuotes -> {
+                record.add(cell.toString())
+                cell.clear()
+            }
+            (char == '\n' || char == '\r') && !inQuotes -> {
+                if (char == '\r' && index + 1 < text.length && text[index + 1] == '\n') {
+                    index += 1
+                }
+                record.add(cell.toString())
+                if (record.any { it.isNotBlank() }) records.add(record.toList())
+                record.clear()
+                cell.clear()
+            }
+            else -> cell.append(char)
+        }
+        index += 1
+    }
+    record.add(cell.toString())
+    if (record.any { it.isNotBlank() }) records.add(record.toList())
+    return records
 }
 
 private fun parseTransactionType(raw: String): TransactionType {

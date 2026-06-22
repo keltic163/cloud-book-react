@@ -1,6 +1,7 @@
-﻿import React, { useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { TransactionType } from '../types';
+import type { StatsSummary } from '../types';
 import { toDateKey } from '../utils/date';
 import { 
   ChevronLeft, 
@@ -37,7 +38,7 @@ const Statistics = () => {
   const [keyword, setKeyword] = useState('');
 
   // --- 核心計算邏輯 ---
-  const stats = useMemo(() => {
+  const localStats = useMemo(() => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth() + 1; 
 
@@ -175,9 +176,43 @@ const Statistics = () => {
       displayBalance,
       chartTotalAmount,
       categoryStats: breakdownCategories,
-      memberStats
+      memberStats,
+      source: 'local' as const
     };
   }, [transactions, users, expenseCategories, incomeCategories, currentDate, timeRange, viewType, selectedMemberId, keyword, filterCategory]);
+  const [remoteStats, setRemoteStats] = useState<StatsSummary | null>(null);
+  const [isStatsLoading, setIsStatsLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadStats = async () => {
+      setIsStatsLoading(true);
+      setRemoteStats(null);
+      try {
+        const summary = await context.getStatsSummary({
+          year: currentDate.getFullYear(),
+          month: currentDate.getMonth() + 1,
+          timeRange,
+          viewType,
+          selectedMemberId,
+          filterCategory,
+          keyword,
+        });
+        if (!cancelled) setRemoteStats(summary);
+      } catch (error) {
+        console.error('Load stats summary failed:', error);
+        if (!cancelled) setRemoteStats(null);
+      } finally {
+        if (!cancelled) setIsStatsLoading(false);
+      }
+    };
+    loadStats();
+    return () => {
+      cancelled = true;
+    };
+  }, [context, currentDate, timeRange, viewType, selectedMemberId, filterCategory, keyword]);
+
+  const stats = remoteStats || localStats;
 
   // --- Helpers ---
   const changeDate = (offset: number) => {
@@ -338,6 +373,10 @@ const Statistics = () => {
                 </div>
             </div>
         )}
+      </div>
+
+      <div className="text-[11px] text-slate-400 text-right">
+        {isStatsLoading ? '統計更新中...' : stats.source === 'aggregate' ? '統計來源：月彙總' : stats.source === 'query' ? '統計來源：索引查詢' : '統計來源：本機資料'}
       </div>
 
       {/* 2. 總覽卡片 */}

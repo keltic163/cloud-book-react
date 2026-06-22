@@ -69,7 +69,7 @@ fun HomeScreen(viewModel: AppViewModel, ledgerState: LedgerUiState) {
     val authState by viewModel.authState.collectAsState()
     val daySheetOpen by viewModel.daySheetOpen.collectAsState()
     val selectedDate by viewModel.selectedDate.collectAsState()
-    val transactions by viewModel.transactions.collectAsState()
+    val dashboardMonthTransactions by viewModel.dashboardMonthTransactions.collectAsState()
     val expenseCategories by viewModel.expenseCategories.collectAsState()
     val incomeCategories by viewModel.incomeCategories.collectAsState()
     val members by viewModel.members.collectAsState()
@@ -248,7 +248,7 @@ fun HomeScreen(viewModel: AppViewModel, ledgerState: LedgerUiState) {
             Box(modifier = Modifier.fillMaxSize().zIndex(1f)) {
                 DayTransactionsSheet(
                     date = currentSheetDate,
-                    transactions = transactions,
+                    transactions = dashboardMonthTransactions,
                     membersById = membersById,
                     expenseCategories = expenseCategories,
                     incomeCategories = incomeCategories,

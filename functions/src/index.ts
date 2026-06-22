@@ -1,7 +1,6 @@
 ﻿import { onCall, HttpsError } from "firebase-functions/v2/https";
 import * as functionsV1 from "firebase-functions/v1";
 import { defineSecret } from "firebase-functions/params";
-import { GoogleGenAI, Type } from "@google/genai";
 import { BetaAnalyticsDataClient } from "@google-analytics/data";
 import * as admin from "firebase-admin";
 
@@ -41,6 +40,144 @@ const DEFAULT_INCOME_CATEGORIES = [
   '點數折抵',
   '其他'
 ];
+
+type TransactionStatsInput = {
+  amount: number;
+  type: 'INCOME' | 'EXPENSE';
+  category: string;
+  rewards: number;
+  date: string;
+  creatorUid: string;
+  targetUserUid?: string | null;
+  deleted: boolean;
+};
+
+type MonthlyStatsDoc = {
+  totalIncome?: number;
+  totalExpense?: number;
+  totalRewards?: number;
+  transactionCount?: number;
+  categoryIncome?: Record<string, number>;
+  categoryExpense?: Record<string, number>;
+  memberIncome?: Record<string, number>;
+  memberExpense?: Record<string, number>;
+  updatedAt?: any;
+};
+
+const tokenizeTransaction = (data: Record<string, any>) => {
+  const source = [
+    data.description,
+    data.category,
+    data.amount,
+    data.rewards,
+  ]
+    .filter((value) => value !== undefined && value !== null)
+    .join(' ')
+    .toLowerCase();
+  const tokens = new Set<string>();
+  const normalized = source.normalize('NFKC');
+  normalized
+    .split(/[\s,，.。:：;；/\\|()[\]{}'"!?！？+-]+/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .forEach((part) => {
+      tokens.add(part);
+      if (part.length >= 2) {
+        for (let size = 2; size <= Math.min(4, part.length); size += 1) {
+          for (let index = 0; index <= part.length - size; index += 1) {
+            tokens.add(part.slice(index, index + size));
+          }
+        }
+      }
+    });
+  return Array.from(tokens).slice(0, 80);
+};
+
+const parseTransactionStatsInput = (data: Record<string, any> | undefined): TransactionStatsInput | null => {
+  if (!data) return null;
+  const amount = Number(data.amount);
+  if (!Number.isFinite(amount)) return null;
+  const date = typeof data.date === 'string' ? data.date : '';
+  if (!/^\d{4}-\d{2}-\d{2}/.test(date)) return null;
+  const type = data.type === 'INCOME' ? 'INCOME' : 'EXPENSE';
+  return {
+    amount,
+    type,
+    category: typeof data.category === 'string' ? data.category : '',
+    rewards: Number(data.rewards) || 0,
+    date: date.slice(0, 10),
+    creatorUid: typeof data.creatorUid === 'string' ? data.creatorUid : '',
+    targetUserUid: typeof data.targetUserUid === 'string' ? data.targetUserUid : null,
+    deleted: data.deleted === true
+  };
+};
+
+const monthKeyFromDate = (date: string) => date.slice(0, 7);
+const yearFromDate = (date: string) => Number(date.slice(0, 4)) || null;
+const statsMemberId = (tx: TransactionStatsInput) => tx.targetUserUid || tx.creatorUid || 'unknown';
+
+const addRecordValue = (record: Record<string, number>, key: string, delta: number) => {
+  if (!key || delta === 0) return;
+  const next = (record[key] || 0) + delta;
+  if (Math.abs(next) < 0.000001) {
+    delete record[key];
+  } else {
+    record[key] = next;
+  }
+};
+
+const applyMonthlyDelta = (
+  stats: MonthlyStatsDoc,
+  tx: TransactionStatsInput,
+  direction: 1 | -1
+) => {
+  const categoryIncome = { ...(stats.categoryIncome || {}) };
+  const categoryExpense = { ...(stats.categoryExpense || {}) };
+  const memberIncome = { ...(stats.memberIncome || {}) };
+  const memberExpense = { ...(stats.memberExpense || {}) };
+  const amountDelta = tx.amount * direction;
+  const rewardsDelta = tx.rewards * direction;
+  const memberId = statsMemberId(tx);
+
+  if (tx.type === 'INCOME') {
+    stats.totalIncome = (stats.totalIncome || 0) + amountDelta;
+    addRecordValue(categoryIncome, tx.category, amountDelta);
+    addRecordValue(memberIncome, memberId, amountDelta + rewardsDelta);
+  } else {
+    stats.totalExpense = (stats.totalExpense || 0) + amountDelta;
+    addRecordValue(categoryExpense, tx.category, amountDelta);
+    addRecordValue(memberExpense, memberId, amountDelta);
+  }
+  if (tx.rewards) {
+    stats.totalIncome = (stats.totalIncome || 0) + rewardsDelta;
+    stats.totalRewards = (stats.totalRewards || 0) + rewardsDelta;
+  }
+  stats.transactionCount = (stats.transactionCount || 0) + direction;
+  stats.categoryIncome = categoryIncome;
+  stats.categoryExpense = categoryExpense;
+  stats.memberIncome = memberIncome;
+  stats.memberExpense = memberExpense;
+};
+
+const normalizeTransactionPatch = (data: Record<string, any>) => {
+  const parsed = parseTransactionStatsInput(data);
+  if (!parsed) return {};
+  return {
+    monthKey: monthKeyFromDate(parsed.date),
+    year: yearFromDate(parsed.date),
+    searchTokens: tokenizeTransaction(data)
+  };
+};
+
+const patchesAreEqual = (current: Record<string, any>, patch: Record<string, any>) => {
+  return Object.entries(patch).every(([key, value]) => {
+    if (Array.isArray(value)) {
+      const existing = Array.isArray(current[key]) ? current[key] : [];
+      return existing.length === value.length && existing.every((item, index) => item === value[index]);
+    }
+    return current[key] === value;
+  });
+};
 const GEMINI_MODELS_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
 const GEMINI_MODEL_PREFERENCE = [
   'gemini-2.5-flash',
@@ -158,6 +295,7 @@ export const parseTransactionHandler = async (request: any) => {
     throw new HttpsError('internal', 'Key resolution failed');
   }
 
+  const { GoogleGenAI } = await import("@google/genai");
   const ai = new GoogleGenAI({ apiKey: apiKeyToUse });
   const today = getTaipeiDateKey(new Date());
 
@@ -184,14 +322,14 @@ export const parseTransactionHandler = async (request: any) => {
       config: {
         responseMimeType: "application/json",
         responseSchema: {
-          type: Type.OBJECT,
+          type: "OBJECT",
           properties: {
-            amount: { type: Type.NUMBER },
-            type: { type: Type.STRING, enum: ["INCOME", "EXPENSE"] },
-            category: { type: Type.STRING, enum: availableCategories },
-            description: { type: Type.STRING },
-            rewards: { type: Type.NUMBER },
-            date: { type: Type.STRING }
+            amount: { type: "NUMBER" },
+            type: { type: "STRING", enum: ["INCOME", "EXPENSE"] },
+            category: { type: "STRING", enum: availableCategories },
+            description: { type: "STRING" },
+            rewards: { type: "NUMBER" },
+            date: { type: "STRING" }
           },
           required: ["amount", "type", "category", "description"],
         },
@@ -485,6 +623,127 @@ export const onUserCreate = functionsV1.auth.user().onCreate(async (user) => {
     ledgers: []
   }, { merge: true });
 });
+
+export const onLedgerTransactionWrite = functionsV1.firestore
+  .document('ledgers/{ledgerId}/transactions/{transactionId}')
+  .onWrite(async (change, context) => {
+    const ledgerId = context.params.ledgerId as string;
+    const beforeData = change.before.exists ? change.before.data() : undefined;
+    const afterData = change.after.exists ? change.after.data() : undefined;
+    const beforeTx = parseTransactionStatsInput(beforeData);
+    const afterTx = parseTransactionStatsInput(afterData);
+    const db = admin.firestore();
+
+    if (afterData && !afterData.deleted) {
+      const patch = normalizeTransactionPatch(afterData);
+      if (Object.keys(patch).length > 0 && !patchesAreEqual(afterData, patch)) {
+        await change.after.ref.set(patch, { merge: true });
+      }
+    }
+
+    const activeBefore = beforeTx && !beforeTx.deleted ? beforeTx : null;
+    const activeAfter = afterTx && !afterTx.deleted ? afterTx : null;
+    const affectedMonths = new Set<string>();
+    if (activeBefore) affectedMonths.add(monthKeyFromDate(activeBefore.date));
+    if (activeAfter) affectedMonths.add(monthKeyFromDate(activeAfter.date));
+    if (affectedMonths.size === 0) return null;
+
+    await db.runTransaction(async (tx) => {
+      const refs = Array.from(affectedMonths).map((monthKey) => ({
+        monthKey,
+        ref: db.doc(`ledgers/${ledgerId}/monthlyStats/${monthKey}`)
+      }));
+      const snaps = await Promise.all(refs.map((entry) => tx.get(entry.ref)));
+      refs.forEach((entry, index) => {
+        const stats: MonthlyStatsDoc = snaps[index].exists ? (snaps[index].data() || {}) : {};
+        if (activeBefore && monthKeyFromDate(activeBefore.date) === entry.monthKey) {
+          applyMonthlyDelta(stats, activeBefore, -1);
+        }
+        if (activeAfter && monthKeyFromDate(activeAfter.date) === entry.monthKey) {
+          applyMonthlyDelta(stats, activeAfter, 1);
+        }
+        tx.set(entry.ref, {
+          ...stats,
+          monthKey: entry.monthKey,
+          year: Number(entry.monthKey.slice(0, 4)),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+      });
+    });
+
+    return null;
+  });
+
+export const adminRebuildLedgerStatsHandler = async (request: any) => {
+  ensureAdminAccess(request);
+  const ledgerId = (request.data as any)?.ledgerId as string | undefined;
+  if (!ledgerId) {
+    throw new HttpsError('invalid-argument', 'Invalid argument');
+  }
+
+  const db = admin.firestore();
+  const txCollection = db.collection(`ledgers/${ledgerId}/transactions`);
+  const monthly = new Map<string, MonthlyStatsDoc>();
+  let scanned = 0;
+  let updatedTransactions = 0;
+  let lastDoc: FirebaseFirestore.QueryDocumentSnapshot | null = null;
+
+  while (true) {
+    let q = txCollection.orderBy(admin.firestore.FieldPath.documentId()).limit(400);
+    if (lastDoc) q = q.startAfter(lastDoc);
+    const snap = await q.get();
+    if (snap.empty) break;
+
+    const batch = db.batch();
+    snap.docs.forEach((docSnap) => {
+      scanned += 1;
+      const data = docSnap.data() || {};
+      const patch = normalizeTransactionPatch(data);
+      if (Object.keys(patch).length > 0 && !patchesAreEqual(data, patch)) {
+        batch.set(docSnap.ref, patch, { merge: true });
+        updatedTransactions += 1;
+      }
+      const parsed = parseTransactionStatsInput(data);
+      if (parsed && !parsed.deleted) {
+        const monthKey = monthKeyFromDate(parsed.date);
+        const stats = monthly.get(monthKey) || {};
+        applyMonthlyDelta(stats, parsed, 1);
+        monthly.set(monthKey, stats);
+      }
+    });
+    await batch.commit();
+    lastDoc = snap.docs[snap.docs.length - 1];
+  }
+
+  const existingStats = await db.collection(`ledgers/${ledgerId}/monthlyStats`).get();
+  const deleteBatch = db.batch();
+  existingStats.docs.forEach((docSnap) => deleteBatch.delete(docSnap.ref));
+  await deleteBatch.commit();
+
+  const entries = Array.from(monthly.entries());
+  for (let index = 0; index < entries.length; index += 400) {
+    const batch = db.batch();
+    entries.slice(index, index + 400).forEach(([monthKey, stats]) => {
+      batch.set(db.doc(`ledgers/${ledgerId}/monthlyStats/${monthKey}`), {
+        ...stats,
+        monthKey,
+        year: Number(monthKey.slice(0, 4)),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+    });
+    await batch.commit();
+  }
+
+  return {
+    ok: true,
+    ledgerId,
+    scanned,
+    updatedTransactions,
+    rebuiltMonths: entries.length
+  };
+};
+
+export const adminRebuildLedgerStats = onCall(adminRebuildLedgerStatsHandler);
 
 const TAIPEI_TZ = 'Asia/Taipei';
 const TAIPEI_OFFSET = '+08:00';

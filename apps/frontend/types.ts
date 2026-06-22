@@ -49,6 +49,9 @@ export interface Transaction {
   updatedAt?: number;
   deleted?: boolean;
   deletedAt?: number;
+  monthKey?: string;
+  year?: number;
+  searchTokens?: string[];
 }
 
 export interface SpendingSummary {
@@ -56,6 +59,42 @@ export interface SpendingSummary {
   totalExpense: number;
   totalRewards: number;
   balance: number;
+}
+
+export type StatsTimeRange = 'month' | 'year';
+
+export interface StatsSummaryParams {
+  year: number;
+  month?: number;
+  timeRange: StatsTimeRange;
+  selectedMemberId?: string | 'all';
+  filterCategory?: string | 'all';
+  keyword?: string;
+  viewType?: TransactionType;
+}
+
+export interface MonthStats {
+  monthKey: string;
+  year: number;
+  totalIncome: number;
+  totalExpense: number;
+  totalRewards: number;
+  transactionCount: number;
+  categoryIncome: Record<string, number>;
+  categoryExpense: Record<string, number>;
+  memberIncome: Record<string, number>;
+  memberExpense: Record<string, number>;
+}
+
+export interface StatsSummary {
+  yearlyData: Array<{ income: number; expense: number }>;
+  displayTotalIncome: number;
+  displayTotalExpense: number;
+  displayBalance: number;
+  categoryStats: Array<{ name: string; amount: number }>;
+  memberStats: Array<{ uid: string; displayName: string | null; photoURL: string | null; color?: string; val: number }>;
+  chartTotalAmount: number;
+  source: 'aggregate' | 'query' | 'local';
 }
 
 export interface SystemAnnouncement {

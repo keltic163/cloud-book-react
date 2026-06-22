@@ -1,6 +1,14 @@
 ﻿{
   "versions": [
     {
+      "version": "1.0.4",
+      "notes": [
+        "修正 CSV/JSON 匯入流程，匯入交易會補齊新版資料庫索引欄位。",
+        "JSON 匯入會還原目標成員，CSV 匯入支援引號欄位與多行描述。",
+        "搭配完整帳本匯出，讓備份與還原可處理大量歷史交易。"
+      ]
+    },
+    {
       "version": "3.5.1",
       "notes": [
         "Recurring templates enabled",

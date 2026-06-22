@@ -1,6 +1,6 @@
 ﻿import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../contexts/AppContext';
-import { TransactionType } from '../types';
+import { Transaction, TransactionType } from '../types';
 import { EditTransactionModal } from './TransactionList';
 import SystemAnnouncement from './SystemAnnouncement';
 import { getTaipeiTimestamp, toDateKey } from '../utils/date';
@@ -12,8 +12,10 @@ const SparklesIcon = ({ className }: { className?: string }) => (
 const SWIPE_THRESHOLD = 50; // Minimum pixels for a swipe to register
 
 const Dashboard = () => {
-  const { transactions, users, updateTransaction, deleteTransaction, setSelectedDate } = useAppContext();
+  const { transactions, users, updateTransaction, deleteTransaction, setSelectedDate, getTransactionsForMonth } = useAppContext();
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [monthTransactions, setMonthTransactions] = useState<Transaction[]>([]);
+  const [isLoadingMonth, setIsLoadingMonth] = useState(false);
   
   // States for Day Detail Drawer
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
@@ -44,6 +46,36 @@ const Dashboard = () => {
     };
   }, [selectedDay]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const loadMonth = async () => {
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth() + 1;
+      setIsLoadingMonth(true);
+      try {
+        const items = await getTransactionsForMonth(year, month);
+        if (!cancelled) setMonthTransactions(items);
+      } catch (e) {
+        console.error('Load dashboard month failed:', e);
+        if (!cancelled) {
+          const fallback = transactions.filter(t => {
+            const key = toDateKey(t.date);
+            if (!key) return false;
+            const [y, m] = key.split('-').map(Number);
+            return y === year && m === month;
+          });
+          setMonthTransactions(fallback);
+        }
+      } finally {
+        if (!cancelled) setIsLoadingMonth(false);
+      }
+    };
+    loadMonth();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentDate, getTransactionsForMonth]);
+
   // Calculate Monthly Stats based on currentDate
   const monthlyStats = useMemo(() => {
     let income = 0;
@@ -51,7 +83,7 @@ const Dashboard = () => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth() + 1;
 
-    transactions.forEach(t => {
+    monthTransactions.forEach(t => {
       const key = toDateKey(t.date);
       if (!key) return;
       const [y, m] = key.split('-').map(Number);
@@ -62,7 +94,7 @@ const Dashboard = () => {
     });
 
     return { income, expense, balance: income - expense };
-  }, [transactions, currentDate]);
+  }, [monthTransactions, currentDate]);
 
   // ✅ 修改：計算「本月回饋」與「歷史總回饋」
   // 這裡使用 currentDate，所以當你切換月份時，本月回饋也會跟著變
@@ -73,13 +105,11 @@ const Dashboard = () => {
     let monthRewards = 0;
     let totalRewards = 0;
 
-    transactions.forEach(t => {
+    monthTransactions.forEach(t => {
       const reward = t.rewards || 0;
       if (reward > 0) {
-        // 1. 累加到歷史總額
         totalRewards += reward;
 
-        // 2. 檢查是否為當前檢視的月份
         const key = toDateKey(t.date);
         if (!key) return;
         const [y, m] = key.split('-').map(Number);
@@ -90,20 +120,21 @@ const Dashboard = () => {
     });
 
     return { monthRewards, totalRewards };
-  }, [transactions, currentDate]);
+  }, [monthTransactions, currentDate]);
 
   // Calendar Logic
   const calendarData = useMemo(() => {
     const year = currentDate.getFullYear();
-    const month = currentDate.getMonth() + 1;
+    const monthIndex = currentDate.getMonth();
+    const month = monthIndex + 1;
     
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const firstDayOfWeek = new Date(year, month, 1).getDay(); // 0 = Sunday
+    const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+    const firstDayOfWeek = new Date(year, monthIndex, 1).getDay(); // 0 = Sunday
     
     // Create mapping of 'YYYY-MM-DD' -> { income, expense }
     const dailyStats: Record<string, { income: number, expense: number }> = {};
     
-    transactions.forEach(t => {
+    monthTransactions.forEach(t => {
       const key = toDateKey(t.date);
       if (!key) return;
       const [y, m, d] = key.split('-').map(Number);
@@ -130,24 +161,23 @@ const Dashboard = () => {
     }
 
     return days;
-  }, [transactions, currentDate]);
+  }, [monthTransactions, currentDate]);
 
   // Selected Day Transactions Logic
   const selectedDayTransactions = useMemo(() => {
     if (!selectedDay) return [];
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth() + 1;
-    return transactions.filter(t => {
+    return monthTransactions.filter(t => {
         const key = toDateKey(t.date);
         if (!key) return false;
         const [y, m, d] = key.split('-').map(Number);
         return y === year && m === month && d === selectedDay;
     }).sort((a, b) => getTaipeiTimestamp(b.date) - getTaipeiTimestamp(a.date));
-  }, [selectedDay, currentDate, transactions]);
+  }, [selectedDay, currentDate, monthTransactions]);
 
   const changeMonth = (offset: number) => {
-    const newDate = new Date(currentDate);
-    newDate.setMonth(newDate.getMonth() + offset);
+    const newDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + offset, 1);
     setCurrentDate(newDate);
     setSelectedDay(null); // Close drawer on month change
   };
@@ -234,7 +264,7 @@ const Dashboard = () => {
   const getUser = (id: string) => users.find(u => u.uid === id);
 
   const monthLabel = currentDate.toLocaleString('zh-TW', { year: 'numeric', month: 'long' });
-  const editingTransaction = transactions.find(t => t.id === editingTxId);
+  const editingTransaction = monthTransactions.find(t => t.id === editingTxId) || transactions.find(t => t.id === editingTxId);
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10 relative">
@@ -245,7 +275,10 @@ const Dashboard = () => {
       {/* Calendar View */}
       <div className="bg-[color:var(--app-surface)] dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-[color:var(--app-border)] dark:border-slate-800 relative z-0 transition-colors">
         <div className="flex items-center justify-between mb-4 px-1">
-           <h3 className="font-bold text-slate-800 dark:text-white">收支日曆</h3>
+           <div>
+             <h3 className="font-bold text-slate-800 dark:text-white">收支日曆</h3>
+             {isLoadingMonth && <div className="text-xs text-slate-400 mt-0.5">載入月份資料中...</div>}
+           </div>
            <div className="flex items-center gap-3 bg-[color:var(--app-bg)] dark:bg-slate-800 rounded-lg p-1">
              <button 
                onClick={() => changeMonth(-1)} 
@@ -388,7 +421,7 @@ const Dashboard = () => {
 
         {/* 次要數字：歷史總計 */}
         <div className="mt-1 text-xs text-amber-600/60 dark:text-amber-500/60 font-medium">
-          歷史累計: ${rewardStats.totalRewards.toLocaleString()}
+          本月已載入: ${rewardStats.totalRewards.toLocaleString()}
         </div>
       </div>
 

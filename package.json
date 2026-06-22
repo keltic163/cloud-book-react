@@ -18,5 +18,8 @@
   },
   "dependencies": {
     "firebase": "^12.7.0"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-win32-x64-msvc": "^4.53.3"
   }
 }
